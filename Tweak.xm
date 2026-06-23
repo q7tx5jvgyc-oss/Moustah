@@ -33,10 +33,7 @@ static MenuPanel *menu;
 
         menu.actionHandler = ^(NSString *action) {
 
-            if ([action isEqualToString:@"add"]) {
-                NSLog(@"Add target");
-
-            } else if ([action isEqualToString:@"clear"]) {
+            if ([action isEqualToString:@"clear"]) {
                 [[ClickManager shared] clear];
 
             } else if ([action isEqualToString:@"start"]) {
