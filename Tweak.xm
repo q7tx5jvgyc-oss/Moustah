@@ -1,20 +1,26 @@
+#import <UIKit/UIKit.h>
+
 %ctor {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC),
                    dispatch_get_main_queue(), ^{
 
-        UIAlertController *alert =
-        [UIAlertController alertControllerWithTitle:@"DYLIB WORKING"
-                                            message:@"Injection Successful"
-                                     preferredStyle:UIAlertControllerStyleAlert];
+        UIWindow *window = nil;
 
-        UIAlertAction *ok =
-        [UIAlertAction actionWithTitle:@"OK"
-                                 style:UIAlertActionStyleDefault
-                               handler:nil];
+        if (@available(iOS 13.0, *)) {
+            window = UIApplication.sharedApplication.windows.firstObject;
+        } else {
+            window = UIApplication.sharedApplication.keyWindow;
+        }
 
-        [alert addAction:ok];
+        if (!window) return;
 
-        UIWindow *window = UIApplication.sharedApplication.windows.firstObject;
-        [window.rootViewController presentViewController:alert animated:YES completion:nil];
+        UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
+        btn.frame = CGRectMake(80, 200, 70, 70);
+        btn.backgroundColor = UIColor.redColor;
+        [btn setTitle:@"Click" forState:UIControlStateNormal];
+
+        [btn addTarget:nil action:nil forControlEvents:UIControlEventTouchUpInside];
+
+        [window addSubview:btn];
     });
 }
