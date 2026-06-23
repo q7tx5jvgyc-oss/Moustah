@@ -24,8 +24,7 @@
 
 - (void)play {
     for (NSValue *v in self.points) {
-        CGPoint p = [v CGPointValue];
-        NSLog(@"Click: %@", NSStringFromCGPoint(p));
+        NSLog(@"Tap: %@", NSStringFromCGPoint([v CGPointValue]));
     }
 }
 
