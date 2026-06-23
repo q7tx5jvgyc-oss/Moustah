@@ -3,29 +3,25 @@
 #import "MenuPanel.h"
 #import "ClickManager.h"
 
-static FloatingButton *floatBtn;
+static FloatingButton *btn;
 static MenuPanel *menu;
 
 %hook SpringBoard
 
 - (void)applicationDidFinishLaunching:(id)application {
-
     %orig;
 
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
-    dispatch_get_main_queue(), ^{
+                   dispatch_get_main_queue(), ^{
 
         UIWindow *window = [UIApplication sharedApplication].keyWindow;
 
-        floatBtn = [[FloatingButton alloc] init];
-        [window addSubview:floatBtn];
-
-        [floatBtn addTarget:nil action:nil forControlEvents:UIControlEventTouchUpInside];
+        btn = [[FloatingButton alloc] init];
+        [window addSubview:btn];
 
         UITapGestureRecognizer *tap =
-        [[UITapGestureRecognizer alloc] initWithTarget:(id)self action:@selector(openMenu)];
-        [floatBtn addGestureRecognizer:tap];
-
+        [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openMenu)];
+        [btn addGestureRecognizer:tap];
     });
 }
 
@@ -33,7 +29,6 @@ static MenuPanel *menu;
 - (void)openMenu {
 
     if (!menu) {
-
         menu = [[MenuPanel alloc] init];
 
         menu.actionHandler = ^(NSString *action) {
@@ -49,9 +44,6 @@ static MenuPanel *menu;
 
             } else if ([action isEqualToString:@"stop"]) {
                 [ClickManager shared].recording = NO;
-
-            } else if ([action isEqualToString:@"record"]) {
-                NSLog(@"recording taps");
 
             } else if ([action isEqualToString:@"play"]) {
                 [[ClickManager shared] play];
