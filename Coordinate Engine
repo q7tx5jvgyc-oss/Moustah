@@ -1,0 +1,19 @@
+#import <UIKit/UIKit.h>
+
+@implementation CoordinateEngine
+
++ (CGPoint)normalize:(CGPoint)p inView:(UIView *)view {
+    CGFloat w = view.bounds.size.width;
+    CGFloat h = view.bounds.size.height;
+
+    return CGPointMake(p.x / w, p.y / h);
+}
+
++ (CGPoint)denormalize:(CGPoint)p inView:(UIView *)view {
+    CGFloat w = view.bounds.size.width;
+    CGFloat h = view.bounds.size.height;
+
+    return CGPointMake(p.x * w, p.y * h);
+}
+
+@end
