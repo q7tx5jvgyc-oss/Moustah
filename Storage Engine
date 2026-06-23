@@ -1,0 +1,13 @@
+#import <Foundation/Foundation.h>
+
+@implementation StorageEngine
+
++ (void)save:(NSArray *)data {
+    [[NSUserDefaults standardUserDefaults] setObject:data forKey:@"records"];
+}
+
++ (NSArray *)load {
+    return [[NSUserDefaults standardUserDefaults] objectForKey:@"records"] ?: @[];
+}
+
+@end
