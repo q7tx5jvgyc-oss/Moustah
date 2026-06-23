@@ -15,7 +15,15 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang make perl git curl ldid
+          sudo apt-get install -y \
+            clang \
+            make \
+            perl \
+            git \
+            curl \
+            xz-utils \
+            zip \
+            unzip
 
       - name: Install Theos
         run: |
@@ -23,8 +31,9 @@ jobs:
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
 
       - name: Build package
+        env:
+          THEOS: ${{ env.THEOS }}
         run: |
-          export THEOS=$HOME/theos
           make package
 
       - name: Upload package
