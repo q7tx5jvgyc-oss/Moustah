@@ -1,4 +1,4 @@
-name: Build
+name: Build Theos Tweak
 
 on:
   workflow_dispatch:
@@ -17,32 +17,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y git make clang perl curl wget xz-utils zip unzip
 
-      - name: Install Theos
+      - name: Install Theos (official way)
         run: |
-          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
 
-      - name: Download SDK
+      - name: Download SDKs
         run: |
           mkdir -p $HOME/theos/sdks
-          cd $HOME/theos/sdks
-          wget https://github.com/theos/sdks/releases/latest/download/iPhoneOS16.5.sdk.tar.xz
-          tar -xf iPhoneOS16.5.sdk.tar.xz
+          curl -L https://github.com/theos/sdks/archive/refs/heads/master.zip -o sdks.zip
+          unzip sdks.zip
+          mv sdks-master/*.sdk $HOME/theos/sdks/
+
+      - name: Fix toolchain (IMPORTANT)
+        run: |
+          mkdir -p $HOME/theos/toolchain/linux/iphone
+          echo "export PATH=$PATH:/usr/bin" >> $GITHUB_ENV
 
       - name: Build
         run: |
           export THEOS=$HOME/theos
+          export PATH=$PATH:/usr/bin
+          make clean || true
           make package
 
       - name: Find output
-        run: |
-          find . -name "*.deb" -o -name "*.dylib"
+        run: find . -name "*.deb" -o -name "*.dylib"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-output
+          name: theos-build
           path: |
             packages/*.deb
             .theos/**/*.deb
             **/*.deb
+            **/*.dylib
