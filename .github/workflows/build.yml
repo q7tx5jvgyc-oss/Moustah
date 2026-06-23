@@ -14,8 +14,16 @@ jobs:
       - name: Build tweak
         uses: Randomblock1/theos-action@v1
 
+      - name: Show files
+        run: |
+          find . -type f | sort
+
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
           name: packages
-          path: packages/*.deb
+          path: |
+            packages/*.deb
+            .theos/**/*.dylib
+            .theos/**/*.deb
+            **/*.deb
