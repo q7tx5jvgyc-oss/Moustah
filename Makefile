@@ -5,7 +5,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = MostashClicker
 
-MostashClicker_FILES = Tweak.xm ClickManager.m MenuPanel.m FloatingButton.m
+MostashClicker_FILES = Tweak.xm init.mm
 MostashClicker_FRAMEWORKS = UIKit Foundation
 
 include $(THEOS_MAKE_PATH)/tweak.mk
