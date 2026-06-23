@@ -1,55 +1,20 @@
-#import <UIKit/UIKit.h>
-#import "FloatingButton.h"
-#import "MenuPanel.h"
-#import "ClickManager.h"
-
-static FloatingButton *btn;
-static MenuPanel *menu;
-
-%hook SpringBoard
-
-- (void)applicationDidFinishLaunching:(id)application {
-    %orig;
-
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
+%ctor {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC),
                    dispatch_get_main_queue(), ^{
 
-        UIWindow *window = [UIApplication sharedApplication].keyWindow;
+        UIAlertController *alert =
+        [UIAlertController alertControllerWithTitle:@"DYLIB WORKING"
+                                            message:@"Injection Successful"
+                                     preferredStyle:UIAlertControllerStyleAlert];
 
-        btn = [[FloatingButton alloc] init];
-        [window addSubview:btn];
+        UIAlertAction *ok =
+        [UIAlertAction actionWithTitle:@"OK"
+                                 style:UIAlertActionStyleDefault
+                               handler:nil];
 
-        UITapGestureRecognizer *tap =
-        [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openMenu)];
-        [btn addGestureRecognizer:tap];
+        [alert addAction:ok];
+
+        UIWindow *window = UIApplication.sharedApplication.windows.firstObject;
+        [window.rootViewController presentViewController:alert animated:YES completion:nil];
     });
 }
-
-%new
-- (void)openMenu {
-
-    if (!menu) {
-        menu = [[MenuPanel alloc] init];
-
-        menu.actionHandler = ^(NSString *action) {
-
-            if ([action isEqualToString:@"clear"]) {
-                [[ClickManager shared] clear];
-
-            } else if ([action isEqualToString:@"start"]) {
-                [ClickManager shared].recording = YES;
-
-            } else if ([action isEqualToString:@"stop"]) {
-                [ClickManager shared].recording = NO;
-
-            } else if ([action isEqualToString:@"play"]) {
-                [[ClickManager shared] play];
-            }
-        };
-    }
-
-    UIWindow *window = [UIApplication sharedApplication].keyWindow;
-    [window addSubview:menu];
-}
-
-%end
