@@ -9,7 +9,7 @@
         self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
         self.layer.cornerRadius = 12;
 
-        NSArray *titles = @[@"Add",@"Clear",@"Start",@"Stop",@"Play"];
+        NSArray *titles = @[@"Clear",@"Start",@"Stop",@"Play"];
 
         for (int i = 0; i < titles.count; i++) {
 
@@ -27,7 +27,7 @@
 
 - (void)tap:(UIButton *)b {
 
-    NSArray *actions = @[@"add",@"clear",@"start",@"stop",@"play"];
+    NSArray *actions = @[@"clear",@"start",@"stop",@"play"];
 
     if (self.actionHandler) {
         self.actionHandler(actions[b.tag]);
