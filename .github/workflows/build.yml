@@ -9,36 +9,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make perl clang ldid dpkg
+          sudo apt-get install -y make perl clang git dpkg dpkg-dev ldid
 
       - name: Setup Theos
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
 
-      - name: Build package
+      - name: Build + Package
         run: |
           make clean || true
-          make package
+          make package FINALPACKAGE=1
 
-      - name: Debug output (IMPORTANT)
+      - name: Collect output files
         run: |
-          echo "===== FIND ALL FILES ====="
-          find . -type f | sort
-          echo "===== DEB FILES ====="
-          find . -name "*.deb" || true
-          echo "===== DYLIB FILES ====="
-          find . -name "*.dylib" || true
+          mkdir -p output
+          find . -name "*.deb" -exec cp {} output/ \; || true
+          find . -name "*.dylib" -exec cp {} output/ \; || true
+          echo "=== FILES GENERATED ==="
+          ls -R output || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-output
-          path: |
-            **/*.deb
-            **/*.dylib
+          name: MostashClicker
+          path: output/
