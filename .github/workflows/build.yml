@@ -1,4 +1,4 @@
-name: Build dylib only
+name: Build
 
 on:
   workflow_dispatch:
@@ -11,24 +11,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Theos
-        run: |
-          git clone --recursive https://github.com/theos/theos.git $HOME/theos
-          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+      - name: Build tweak
+        uses: Randomblock1/theos-action@v1
 
-      - name: Build
-        run: |
-          export THEOS=$HOME/theos
-          make clean
-          make
-
-      - name: Extract ONLY dylib
+      - name: Find ONLY dylib
         run: |
           mkdir -p output
-          find . -name "*.dylib" | head -n 1 | xargs -I{} cp {} output/MostashClicker.dylib
 
-      - name: Upload ONLY file
+          # أخذ أول dylib فقط (الملف النهائي)
+          FILE=$(find . -name "*.dylib" | head -n 1)
+
+          echo "Found dylib: $FILE"
+
+          cp "$FILE" output/MostashClicker.dylib
+
+          ls -lah output
+
+      - name: Upload ONLY dylib
         uses: actions/upload-artifact@v4
         with:
-          name: MostashClicker
+          name: MostashClicker-dylib
           path: output/MostashClicker.dylib
