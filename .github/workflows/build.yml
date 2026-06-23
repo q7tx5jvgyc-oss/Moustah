@@ -1,4 +1,4 @@
-name: Build
+name: Build Single dylib
 
 on:
   workflow_dispatch:
@@ -9,31 +9,51 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Build tweak
-        uses: Randomblock1/theos-action@v1
-
-      - name: Show build output
+      - name: Install dependencies
         run: |
-          echo "=== ALL FILES ==="
-          find . -type f | sort
+          sudo apt-get update
+          sudo apt-get install -y git make clang perl curl wget xz-utils zip unzip
 
-          echo "=== THEOS OUTPUT ==="
-          find .theos -type f 2>/dev/null || true
+      - name: Install Theos
+        run: |
+          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
 
-          echo "=== PACKAGES ==="
-          find packages -type f 2>/dev/null || true
+      - name: Download iOS SDK
+        run: |
+          mkdir -p $HOME/theos/sdks
+          cd $HOME/theos/sdks
+          wget https://github.com/theos/sdks/releases/latest/download/iPhoneOS16.5.sdk.tar.xz
+          tar -xf iPhoneOS16.5.sdk.tar.xz
 
-      - name: Collect outputs
+      - name: Build dylib
+        run: |
+          export THEOS=$HOME/theos
+          make clean
+          make
+
+      - name: Locate dylib
+        run: |
+          echo "Searching dylib..."
+          find . -name "*.dylib"
+
+      - name: Export ONLY dylib
         run: |
           mkdir -p output
 
-          find . -name "*.deb" -exec cp {} output/ \; || true
-          find . -name "*.dylib" -exec cp {} output/ \; || true
+          DLIB=$(find . -name "*.dylib" | head -n 1)
 
-      - name: Upload artifact
+          echo "Found: $DLIB"
+
+          cp "$DLIB" output/MostashClicker.dylib
+
+          ls -lah output
+
+      - name: Upload ONLY dylib
         uses: actions/upload-artifact@v4
         with:
-          name: build-output
-          path: output/*
+          name: MostashClicker-dylib
+          path: output/MostashClicker.dylib
