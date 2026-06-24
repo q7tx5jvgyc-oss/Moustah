@@ -1,13 +1,13 @@
 #import "AppDelegate.h"
-#import "OverlayManager.h"
+#import "ConfigManager.h"
 
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 
-    NSLog(@"APP STARTED");
+    NSLog(@"App Started");
 
-    [[OverlayManager shared] startOverlay];
+    [[ConfigManager shared] loadConfig];
 
     return YES;
 }
