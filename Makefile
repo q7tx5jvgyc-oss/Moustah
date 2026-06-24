@@ -5,8 +5,8 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = MostashClicker
 
-# هنا تم إبقاء ملف Tweak.xm فقط لمنع أي تعارض أثناء الحقن بـ Ksign
-MostashClicker_FILES = Tweak.xm
-MostashClicker_FRAMEWORKS = UIKit Foundation
+# هنا نخبر المترجم ببناء ملف التويك وملف مكتبة اللمس معاً
+MostashClicker_FILES = Tweak.xm ZSFakeTouch.m
+MostashClicker_FRAMEWORKS = UIKit Foundation CoreGraphics
 
 include $(THEOS_MAKE_PATH)/tweak.mk
