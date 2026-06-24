@@ -1,52 +1,38 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-// نافذة مخصصة تفاعلية لتمرير اللمس للأماكن الشفافة في اللعبة
-@interface MostashUltraWindow : UIWindow
-@end
-
-@implementation MostashUltraWindow
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    UIView *hitView = [super hitTest:point withEvent:event];
-    if (hitView == self || hitView == self.rootViewController.view) {
-        return nil; // تمرير اللمس للعبة مباشرة بالخلف
-    }
-    return hitView; // الاستجابة الفورية للزر والقائمة فقط
-}
-@end
-
-static MostashUltraWindow *globalTweakWindow = nil;
+static UIButton *globalUltraButton = nil;
 static UIView *mainMenuPanel = nil;
 static CGPoint savedBtnCenter;
 static BOOL isMenuOpen = NO;
 
-@interface MostashUltraCore : NSObject
+@interface MostashSideloadCore : NSObject
 + (instancetype)sharedInstance;
-- (void)injectUltraUI;
+- (void)injectDirectlyToGameView;
 - (void)handleUltraPan:(UIPanGestureRecognizer *)gesture;
 - (void)toggleUltraMenu;
 @end
 
-@implementation MostashUltraCore
+@implementation MostashSideloadCore
 
 + (instancetype)sharedInstance {
-    static MostashUltraCore *shared = nil;
+    static MostashSideloadCore *shared = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         shared = [[self alloc] init];
-        // تعيين موقع البدء الافتراضي للزر العائم على شاشة اللعبة
         savedBtnCenter = CGPointMake(65, [UIScreen mainScreen].bounds.size.height / 3);
     });
     return shared;
 }
 
-- (void)injectUltraUI {
+// القوة الحقيقية: حقن الزر داخل شاشة اللعبة النشطة مباشرة بدون إنشاء UIWindow جديدة
+- (void)injectDirectlyToGameView {
     if (![NSThread isMainThread]) {
-        dispatch_async(dispatch_get_main_queue(), ^{ [self injectUltraUI]; });
+        dispatch_async(dispatch_get_main_queue(), ^{ [self injectDirectlyToGameView]; });
         return;
     }
 
-    // البحث عن النافذة النشطة الحالية للعبة لربط الـ Scene وتفادي قيود نظام iOS
+    // 1. الحصول على النافذة النشطة الأصلية للعبة يلا لودو
     UIWindow *gameWindow = nil;
     if (@available(iOS 13.0, *)) {
         for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
@@ -59,98 +45,84 @@ static BOOL isMenuOpen = NO;
         }
     }
     if (!gameWindow) gameWindow = [UIApplication sharedApplication].keyWindow;
+    if (!gameWindow && [UIApplication sharedApplication].windows.count > 0) {
+        gameWindow = [UIApplication sharedApplication].windows.firstObject;
+    }
 
-    // بناء النافذة العائمة إذا لم تكن موجودة في الذاكرة مسبقاً
-    if (!globalTweakWindow) {
-        globalTweakWindow = [[MostashUltraWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        globalTweakWindow.backgroundColor = [UIColor clearColor];
-        globalTweakWindow.clipsToBounds = NO;
+    // إذا لم تكن شاشة اللعبة جاهزة بعد، ننتظر الدورة القادمة للمؤقت
+    if (!gameWindow) return;
+
+    // الحصول على الشاشة الرئيسية للتحكم داخل اللعبة
+    UIView *targetView = gameWindow.rootViewController.view;
+    if (!targetView) targetView = gameWindow;
+
+    // 2. بناء الزر وحقنه داخل واجهة اللعبة مباشرة إذا لم يكن موجوداً
+    if (!globalUltraButton || !globalUltraButton.superview) {
+        [globalUltraButton removeFromSuperview]; // تنظيف إذا كان هناك مخلفات قديمة
         
-        // منع نظام حماية اللعبة من تتبع نافذة الأداة بسهولة
-        if ([globalTweakWindow respondsToSelector:@selector(setAccessibilityElementsHidden:)]) {
-            globalTweakWindow.accessibilityElementsHidden = YES;
-        }
-
-        UIViewController *rootVC = [[UIViewController alloc] init];
-        rootVC.view.backgroundColor = [UIColor clearColor];
-        globalTweakWindow.rootViewController = rootVC;
-
-        // تصميم الزر العائم الخارق "M" (أحمر ناري متوهج)
-        UIButton *ultraBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-        ultraBtn.frame = CGRectMake(0, 0, 72, 72);
-        ultraBtn.center = savedBtnCenter;
-        ultraBtn.backgroundColor = [UIColor colorWithRed:0.88 green:0.06 blue:0.06 alpha:0.98];
-        [ultraBtn setTitle:@"M" forState:UIControlStateNormal];
-        [ultraBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        ultraBtn.titleLabel.font = [UIFont fontWithName:@"AvenirNext-Heavy" size:26];
-        ultraBtn.layer.cornerRadius = 36;
-        ultraBtn.layer.borderColor = [UIColor whiteColor].CGColor;
-        ultraBtn.layer.borderWidth = 2.0;
+        globalUltraButton = [UIButton buttonWithType:UIButtonTypeCustom];
+        globalUltraButton.frame = CGRectMake(0, 0, 72, 72);
+        globalUltraButton.center = savedBtnCenter;
+        globalUltraButton.backgroundColor = [UIColor colorWithRed:0.88 green:0.06 blue:0.06 alpha:0.98]; // أحمر ناري
+        [globalUltraButton setTitle:@"M" forState:UIControlStateNormal];
+        [globalUltraButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        globalUltraButton.titleLabel.font = [UIFont fontWithName:@"AvenirNext-Heavy" size:26];
+        globalUltraButton.layer.cornerRadius = 36;
+        globalUltraButton.layer.borderColor = [UIColor whiteColor].CGColor;
+        globalUltraButton.layer.borderWidth = 2.0;
         
-        // تأثير الظل ثلاثي الأبعاد لتمييز الزر في اللعب
-        ultraBtn.layer.shadowColor = [UIColor blackColor].CGColor;
-        ultraBtn.layer.shadowOpacity = 0.85;
-        ultraBtn.layer.shadowOffset = CGSizeMake(0, 5);
-        ultraBtn.layer.shadowRadius = 6;
-        ultraBtn.tag = 9991;
+        globalUltraButton.layer.shadowColor = [UIColor blackColor].CGColor;
+        globalUltraButton.layer.shadowOpacity = 0.85;
+        globalUltraButton.layer.shadowOffset = CGSizeMake(0, 4);
+        globalUltraButton.layer.shadowRadius = 5;
 
-        [ultraBtn addTarget:self action:@selector(toggleUltraMenu) forControlEvents:UIControlEventTouchUpInside];
+        [globalUltraButton addTarget:self action:@selector(toggleUltraMenu) forControlEvents:UIControlEventTouchUpInside];
         
         UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleUltraPan:)];
         pan.cancelsTouchesInView = NO;
-        [ultraBtn addGestureRecognizer:pan];
+        [globalUltraButton addGestureRecognizer:pan];
 
-        [globalTweakWindow addSubview:ultraBtn];
+        // إضافة الزر داخل فيو اللعبة مباشرة ليصبح جزءاً من جرافيكس اللعبة مجبراً!
+        [targetView addSubview:globalUltraButton];
     }
 
-    // القوة المطلقة: ضبط مستوى العرض لأعلى درجة (MAXFLOAT) لضمان الفوقية التامة فوق يلا لودو
-    globalTweakWindow.windowLevel = MAXFLOAT;
-    if (@available(iOS 13.0, *)) {
-        if (gameWindow && gameWindow.windowScene && globalTweakWindow.windowScene != gameWindow.windowScene) {
-            globalTweakWindow.windowScene = gameWindow.windowScene;
-        }
-    }
-
-    if (globalTweakWindow.hidden) {
-        globalTweakWindow.hidden = NO;
-        [globalTweakWindow makeKeyAndVisible];
+    // إجبار زر التويك والقائمة على البقاء في المقدمة دائماً فوق عناصر لودو
+    [targetView bringSubviewToFront:globalUltraButton];
+    if (mainMenuPanel && isMenuOpen) {
+        [targetView bringSubviewToFront:mainMenuPanel];
     }
 }
 
-// محرك السحب والتحريك الفائق النعومة
 - (void)handleUltraPan:(UIPanGestureRecognizer *)gesture {
     UIView *button = gesture.view;
-    CGPoint translation = [gesture translationInView:globalTweakWindow];
+    UIView *parentView = button.superview;
+    CGPoint translation = [gesture translationInView:parentView];
     
     if (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged) {
         CGPoint newCenter = CGPointMake(button.center.x + translation.x, button.center.y + translation.y);
         CGSize sSize = [UIScreen mainScreen].bounds.size;
         
-        // منع الزر العائم من الهروب خارج حدود شاشات الأجهزة
         if (newCenter.x >= 36 && newCenter.x <= sSize.width - 36 &&
             newCenter.y >= 36 && newCenter.y <= sSize.height - 36) {
             button.center = newCenter;
         }
-        [gesture setTranslation:CGPointZero inView:globalTweakWindow];
+        [gesture setTranslation:CGPointZero inView:parentView];
     }
     if (gesture.state == UIGestureRecognizerStateEnded) {
-        savedBtnCenter = button.center; // حفظ الإحداثيات الجديدة فوراً
+        savedBtnCenter = button.center;
     }
 }
 
-// فتح وإغلاق قائمة التحكم عند النقر على الزر العائم
 - (void)toggleUltraMenu {
+    UIView *parentView = globalUltraButton.superview;
+    if (!parentView) return;
+
     if (!mainMenuPanel) {
-        // تصميم واجهة الأوتو كليكر السوداء الملكية المضيئة بالأحمر
         mainMenuPanel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 400)];
-        mainMenuPanel.backgroundColor = [UIColor colorWithRed:0.03 green:0.03 blue:0.05 alpha:0.97];
+        mainMenuPanel.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.06 alpha:0.98];
         mainMenuPanel.layer.cornerRadius = 20;
         mainMenuPanel.layer.borderWidth = 2.5;
         mainMenuPanel.layer.borderColor = [UIColor colorWithRed:0.88 green:0.06 blue:0.06 alpha:1.0].CGColor;
-
-        mainMenuPanel.layer.shadowColor = [UIColor blackColor].CGColor;
-        mainMenuPanel.layer.shadowOpacity = 0.9;
-        mainMenuPanel.layer.shadowRadius = 15;
 
         UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 20, 320, 30)];
         title.text = @"MOSTASH AUTOCLICKER v1.0";
@@ -159,7 +131,6 @@ static BOOL isMenuOpen = NO;
         title.font = [UIFont fontWithName:@"HelveticaNeue-CondensedBold" size:20];
         [mainMenuPanel addSubview:title];
         
-        // زر إغلاق القائمة التفاعلي ✕
         UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
         close.frame = CGRectMake(275, 15, 35, 35);
         [close setTitle:@"✕" forState:UIControlStateNormal];
@@ -173,31 +144,27 @@ static BOOL isMenuOpen = NO;
         [mainMenuPanel removeFromSuperview];
         isMenuOpen = NO;
     } else {
-        mainMenuPanel.center = globalTweakWindow.center;
-        [globalTweakWindow addSubview:mainMenuPanel];
+        mainMenuPanel.center = parentView.center;
+        [parentView addSubview:mainMenuPanel];
+        [parentView bringSubviewToFront:mainMenuPanel];
         isMenuOpen = YES;
     }
 }
 @end
 
-// دالة البدء الذاتية عند الحقن بـ Ksign والمحدثة لبندل يلا لودو الجديد
+// محرك التهيئة الرئيسي المتوافق 100% مع أجهزة السلايدلود والتوقيع عبر الجوال
 __attribute__((constructor))
-static void sideload_ultra_init() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        
+static void sideload_direct_view_init() {
+    NSLog(@"🔥 [MostashClicker] Core Subview Injector Initiated!");
+    
+    // مؤقت دائم وشرس يعمل كل 1.0 ثانية لفحص شاشة اللعبة وحقن الزر داخلها إجبارياً
+    NSTimer *injectorTimer = [NSTimer timerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
         NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier];
         
-        // التحقق الدقيق من معرّف حزمة لعبتك
+        // التحقق من البندل الصحيح ليلّا لودو الخاص بك لإنعاش الأداة
         if ([bundleID isEqualToString:@"com.yalla.yallagame"]) {
-            NSLog(@"🔥 [MostashClicker] Target Match: Yalla Ludo Hooked Successfully!");
-            
-            // حلقة تكرار وإنعاش فورية (كل 1.5 ثانية) لإجبار النظام على رسم التويك فوق محرك اللعبة دائماً
-            NSTimer *reviveTimer = [NSTimer timerWithTimeInterval:1.5 repeats:YES block:^(NSTimer * _Nonnull timer) {
-                [[MostashUltraCore sharedInstance] injectUltraUI];
-            }];
-            [[NSRunLoop mainRunLoop] addTimer:reviveTimer forMode:NSRunLoopCommonModes];
-        } else {
-            NSLog(@"❌ [MostashClicker] Bundle Mismatch: %@", bundleID);
+            [[MostashSideloadCore sharedInstance] injectDirectlyToGameView];
         }
-    });
+    }];
+    [[NSRunLoop mainRunLoop] addTimer:injectorTimer forMode:NSRunLoopCommonModes];
 }
