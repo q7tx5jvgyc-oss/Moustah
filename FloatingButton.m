@@ -1,30 +1,47 @@
 #import "FloatingButton.h"
 
+@interface FloatingButton ()
+@property (nonatomic, strong) UIButton *button;
+@end
+
 @implementation FloatingButton
 
 - (instancetype)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:CGRectMake(120, 200, 60, 60)];
+    self = [super initWithFrame:frame];
     if (self) {
-
-        self.backgroundColor = UIColor.systemBlueColor;
-        [self setTitle:@"M" forState:UIControlStateNormal];
-
-        self.layer.cornerRadius = 30;
-        self.clipsToBounds = YES;
-
-        UIPanGestureRecognizer *pan =
-        [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(move:)];
-        [self addGestureRecognizer:pan];
+        [self setup];
     }
     return self;
 }
 
-- (void)move:(UIPanGestureRecognizer *)p {
-    UIView *v = self.superview;
-    CGPoint t = [p translationInView:v];
+- (void)setup {
 
-    self.center = CGPointMake(self.center.x + t.x, self.center.y + t.y);
-    [p setTranslation:CGPointZero inView:v];
+    self.frame = CGRectMake(100, 200, 70, 70);
+    self.backgroundColor = UIColor.clearColor;
+
+    self.button = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.button.frame = self.bounds;
+    self.button.backgroundColor = UIColor.systemBlueColor;
+    self.button.layer.cornerRadius = 35;
+    [self.button setTitle:@"M" forState:UIControlStateNormal];
+
+    [self.button addTarget:self action:@selector(tap) forControlEvents:UIControlEventTouchUpInside];
+
+    [self addSubview:self.button];
+
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(drag:)];
+    [self addGestureRecognizer:pan];
+}
+
+- (void)tap {
+    NSLog(@"Floating Button Tapped");
+}
+
+- (void)drag:(UIPanGestureRecognizer *)pan {
+
+    CGPoint move = [pan translationInView:self.superview];
+    self.center = CGPointMake(self.center.x + move.x, self.center.y + move.y);
+    [pan setTranslation:CGPointZero inView:self.superview];
 }
 
 @end
