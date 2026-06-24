@@ -1,4 +1,4 @@
 #import <UIKit/UIKit.h>
 
-@interface FloatingButton : UIButton
+@interface FloatingButton : UIView
 @end
