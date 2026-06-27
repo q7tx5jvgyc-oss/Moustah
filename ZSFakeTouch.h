@@ -1,8 +1,23 @@
+#import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-@interface ZSFakeTouch : NSObject
+@interface ZSTouchEngine : NSObject
 
-// الدالة البرمجية المسؤولة عن إرسال النقرة الحقيقية للنظام عبر الإحداثيات
-+ (void)pointTap:(CGPoint)point;
++ (instancetype)shared;
+
+- (void)startEngine;
+- (void)stopEngine;
+
+- (void)beginRecording;
+- (void)stopRecording;
+
+- (void)playRecording;
+
+- (void)addTarget:(CGPoint)point;
+- (void)clearTargets;
+
+@property (nonatomic, assign) CGFloat playbackSpeed;
+
+- (void)captureTouch:(CGPoint)point;
 
 @end
