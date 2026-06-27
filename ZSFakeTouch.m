@@ -1,68 +1,100 @@
-#import "ZSFakeTouch.h"
-#import <objc/runtime.h>
+#import "ZSTouchEngine.h"
 
-// تعريف الهياكل الداخلية لنظام iOS والمسؤولة عن ضخ أحداث اللمس (IOHIDEvent)
-typedef struct {
-    int origin;
-    int page;
-    int usage;
-} MostashIOHIDEventData;
+@interface ZSTouchEngine ()
 
-@implementation ZSFakeTouch
+@property (nonatomic, strong) NSMutableArray *recordedEvents;
+@property (nonatomic, strong) NSMutableArray *targets;
+@property (nonatomic, assign) BOOL isRecording;
+@property (nonatomic, assign) BOOL isRunning;
 
-+ (void)pointTap:(CGPoint)point {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        // استهداف النافذة الرئيسية النشطة للتطبيق وضخ الحدث بداخلها
-        UIWindow *window = nil;
-        if (@available(iOS 13.0, *)) {
-            for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
-                if (scene.activationState == UISceneActivationStateForegroundActive && [scene isKindOfClass:[UIWindowScene class]]) {
-                    for (UIWindow *w in ((UIWindowScene *)scene).windows) {
-                        if (w.isKeyWindow) { window = w; break; }
-                    }
-                }
-            }
-        }
-        if (!window) window = [UIApplication sharedApplication].keyWindow;
-        if (!window && [UIApplication sharedApplication].windows.count > 0) {
-            window = [UIApplication sharedApplication].windows.firstObject;
-        }
-        
-        if (!window) return;
+@end
 
-        // محاكاة مصفوفة النقرات الطبيعية للـ UIKit لمخادعة حماية اللعبة
-        UITouch *touch = [[UITouch alloc] init];
-        [touch setPhase:UITouchPhaseBegan];
-        
-        // تعيين إحداثيات النقرة داخل النافذة
-        #pragma clang diagnostic push
-        #pragma clang diagnostic ignored "-Wundeclared-selector"
-        if ([touch respondsToSelector:@selector(setWindow:)]) {
-            [touch performSelector:@selector(setWindow:) withObject:window];
-        }
-        #pragma clang diagnostic pop
-        
-        // إرسال كود اللمس الحقيقي المبني على مستوى الأوامر اللاسلكية للنظام
-        UIEvent *event = [[UIApplication sharedApplication] performSelector:@selector(_touchesEvent)];
-        
-        // استدعاء المكونات الأساسية للـ Runtime لضخ النقرة
-        CGPoint convertedPoint = [window convertPoint:point toView:window.rootViewController.view];
-        UIView *hitView = [window.rootViewController.view hitTest:convertedPoint withEvent:event];
-        
-        if (hitView) {
-            NSMutableSet *touches = [[NSMutableSet alloc] initWithObjects:touch, nil];
-            
-            // تنفيذ دورة اللمس البشرية الكاملة (Began -> Ended)
-            if ([hitView respondsToSelector:@selector(touchesBegan:withEvent:)]) {
-                [hitView touchesBegan:touches withEvent:event];
-                
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.05 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-                    [touch setPhase:UITouchPhaseEnded];
-                    [hitView touchesEnded:touches withEvent:event];
-                });
-            }
+@implementation ZSTouchEngine
+
++ (instancetype)shared {
+    static ZSTouchEngine *obj;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        obj = [ZSTouchEngine new];
+        obj.recordedEvents = [NSMutableArray array];
+        obj.targets = [NSMutableArray array];
+        obj.playbackSpeed = 1.0;
+    });
+    return obj;
+}
+
+- (void)startEngine {
+    self.isRunning = YES;
+}
+
+- (void)stopEngine {
+    self.isRunning = NO;
+}
+
+- (void)beginRecording {
+    self.isRecording = YES;
+    [self.recordedEvents removeAllObjects];
+}
+
+- (void)stopRecording {
+    self.isRecording = NO;
+}
+
+- (void)captureTouch:(CGPoint)point {
+    if (!self.isRecording) return;
+
+    NSDictionary *event = @{
+        @"x": @(point.x),
+        @"y": @(point.y),
+        @"time": @([[NSDate date] timeIntervalSince1970])
+    };
+
+    [self.recordedEvents addObject:event];
+}
+
+- (void)playRecording {
+    if (!self.isRunning || self.recordedEvents.count == 0) return;
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+
+        for (NSDictionary *event in self.recordedEvents) {
+
+            if (!self.isRunning) break;
+
+            CGFloat x = [event[@"x"] floatValue];
+            CGFloat y = [event[@"y"] floatValue];
+
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self simulateTouch:CGPointMake(x, y)];
+            });
+
+            [NSThread sleepForTimeInterval:0.05 / self.playbackSpeed];
         }
     });
+}
+
+- (void)simulateTouch:(CGPoint)point {
+    UIView *dot = [[UIView alloc] initWithFrame:CGRectMake(point.x, point.y, 10, 10)];
+    dot.backgroundColor = UIColor.redColor;
+    dot.layer.cornerRadius = 5;
+
+    UIWindow *window = UIApplication.sharedApplication.keyWindow;
+    [window addSubview:dot];
+
+    [UIView animateWithDuration:0.25 animations:^{
+        dot.alpha = 0;
+        dot.transform = CGAffineTransformMakeScale(2, 2);
+    } completion:^(BOOL finished) {
+        [dot removeFromSuperview];
+    }];
+}
+
+- (void)addTarget:(CGPoint)point {
+    [self.targets addObject:@{@"x":@(point.x), @"y":@(point.y)}];
+}
+
+- (void)clearTargets {
+    [self.targets removeAllObjects];
 }
 
 @end
