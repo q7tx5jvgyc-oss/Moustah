@@ -6,30 +6,21 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 
-    NSLog(@"App Started");
-
     [[ConfigManager shared] loadConfig];
 
-    UIWindow *window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-    self.window = window;
+    self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
 
-    // 🔐 تحقق من التفعيل
+    UIViewController *root;
+
     if ([[ConfigManager shared] isActivated]) {
-
-        // التطبيق مفعل → يفتح مباشرة (هنا ضع الـ main VC)
-        UIViewController *mainVC = [UIViewController new];
-        mainVC.view.backgroundColor = UIColor.whiteColor;
-
-        window.rootViewController = mainVC;
-
+        root = [UIViewController new];
+        root.view.backgroundColor = UIColor.systemBackgroundColor;
     } else {
-
-        // غير مفعل → يروح لشاشة التفعيل
-        ActivationViewController *vc = [ActivationViewController new];
-        window.rootViewController = vc;
+        root = [ActivationViewController new];
     }
 
-    [window makeKeyAndVisible];
+    self.window.rootViewController = root;
+    [self.window makeKeyAndVisible];
 
     return YES;
 }
