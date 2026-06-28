@@ -1,5 +1,12 @@
 #import "ActivationViewController.h"
 #import "ConfigManager.h"
+#import <objc/runtime.h>
+
+@interface ActivationViewController ()
+
+@property (nonatomic, strong) UITextField *input;
+
+@end
 
 @implementation ActivationViewController
 
@@ -8,47 +15,73 @@
 
     self.view.backgroundColor = UIColor.blackColor;
 
-    UITextField *input = [[UITextField alloc] initWithFrame:CGRectMake(40, 200, 250, 50)];
-    input.placeholder = @"Enter Code";
-    input.backgroundColor = UIColor.whiteColor;
-    input.textAlignment = NSTextAlignmentCenter;
-    [self.view addSubview:input];
+    // Input
+    self.input = [[UITextField alloc] initWithFrame:CGRectMake(40, 200, 250, 50)];
+    self.input.placeholder = @"Enter Code";
+    self.input.backgroundColor = UIColor.whiteColor;
+    self.input.textAlignment = NSTextAlignmentCenter;
+    self.input.layer.cornerRadius = 8;
+    self.input.clipsToBounds = YES;
+    [self.view addSubview:self.input];
 
+    // Button
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
     btn.frame = CGRectMake(100, 300, 120, 50);
     [btn setTitle:@"Activate" forState:UIControlStateNormal];
+    btn.backgroundColor = UIColor.systemBlueColor;
+    [btn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    btn.layer.cornerRadius = 10;
     [btn addTarget:self action:@selector(checkCode:) forControlEvents:UIControlEventTouchUpInside];
-    btn.tag = 100;
     [self.view addSubview:btn];
-
-    objc_setAssociatedObject(btn, @"input", input, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
+
+#pragma mark - Activation
 
 - (void)checkCode:(UIButton *)sender {
 
-    UITextField *input = objc_getAssociatedObject(sender, @"input");
+    NSString *code = self.input.text;
 
-    NSArray *validCodes = @[@"MOSTAH1", @"MOSTAH2", @"MOSTAH3"];
+    if (code.length == 0) {
+        [self showAlert:@"Error" message:@"Please enter a code"];
+        return;
+    }
 
-    if ([validCodes containsObject:input.text]) {
+    NSArray *validCodes = @[
+        @"MOSTAH1",
+        @"MOSTAH2",
+        @"MOSTAH3"
+    ];
+
+    if ([validCodes containsObject:code]) {
 
         [[ConfigManager shared] setIsActivated:YES];
         [[ConfigManager shared] saveConfig];
 
-        UIAlertController *alert =
-        [UIAlertController alertControllerWithTitle:@"Success"
-                                            message:@"Activated Successfully"
-                                     preferredStyle:UIAlertControllerStyleAlert];
-
-        [self presentViewController:alert animated:YES completion:nil];
-
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            [alert dismissViewControllerAnimated:YES completion:nil];
-        });
+        [self showAlert:@"Success" message:@"Activated Successfully"];
 
     } else {
-        exit(0);
+
+        [self showAlert:@"Error" message:@"Invalid Code"];
     }
+}
+
+#pragma mark - Alert Helper
+
+- (void)showAlert:(NSString *)title message:(NSString *)msg {
+
+    UIAlertController *alert =
+    [UIAlertController alertControllerWithTitle:title
+                                        message:msg
+                                 preferredStyle:UIAlertControllerStyleAlert];
+
+    UIAlertAction *ok =
+    [UIAlertAction actionWithTitle:@"OK"
+                             style:UIAlertActionStyleDefault
+                           handler:nil];
+
+    [alert addAction:ok];
+
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 @end
