@@ -3,6 +3,7 @@
 #define KEY_ACTIVE @"MOSTASH_ACTIVE"
 #define KEY_TYPE   @"MOSTASH_TYPE"
 #define KEY_EXPIRE @"MOSTASH_EXPIRE"
+#define KEY_DEVICE @"MOSTASH_DEVICE"
 
 @implementation LicenseManager
 
@@ -11,6 +12,7 @@ static NSArray *permanentCodes;
 
 + (void)initialize {
 
+    // ⏳ DAILY CODES (15)
     dailyCodes = @[
         @"MOSTASH7A9K",
         @"MOSTASH2B6M",
@@ -29,6 +31,7 @@ static NSArray *permanentCodes;
         @"MOSTASH8R2T"
     ];
 
+    // ♾️ PERMANENT CODES (20)
     permanentCodes = @[
         @"MOSTASH7A9K1XQ3",
         @"MOSTASH2B6M9LZ8",
@@ -42,7 +45,7 @@ static NSArray *permanentCodes;
         @"MOSTASH7L1P3XT9",
         @"MOSTASH2M8V6QK4",
         @"MOSTASH9N3Y1RT7",
-        @"MOSTASH5P6X-8LM2",
+        @"MOSTASH5P6X8LM2",
         @"MOSTASH1Q7B4NV9",
         @"MOSTASH8R2T6YK5",
         @"MOSTASH3S9L1PX7",
@@ -53,6 +56,8 @@ static NSArray *permanentCodes;
     ];
 }
 
+#pragma mark - Singleton
+
 + (instancetype)shared {
     static LicenseManager *obj;
     static dispatch_once_t onceToken;
@@ -62,13 +67,27 @@ static NSArray *permanentCodes;
     return obj;
 }
 
+#pragma mark - Validate Code
+
 - (LicenseType)validateCode:(NSString *)code {
 
+    // 🔐 ربط بجهاز واحد فقط
+    NSString *deviceID = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
+    NSString *savedDevice = [[NSUserDefaults standardUserDefaults] stringForKey:KEY_DEVICE];
+
+    if (!savedDevice) {
+        [[NSUserDefaults standardUserDefaults] setObject:deviceID forKey:KEY_DEVICE];
+    } else if (![savedDevice isEqualToString:deviceID]) {
+        return LicenseTypeInvalid; // 🚫 جهاز مختلف
+    }
+
+    // ⏳ DAILY
     if ([dailyCodes containsObject:code]) {
         [self activateDaily];
         return LicenseTypeDaily;
     }
 
+    // ♾️ PERMANENT
     if ([permanentCodes containsObject:code]) {
         [self activatePermanent];
         return LicenseTypePermanent;
@@ -77,21 +96,29 @@ static NSArray *permanentCodes;
     return LicenseTypeInvalid;
 }
 
+#pragma mark - Daily Activation
+
 - (void)activateDaily {
 
-    NSDate *expire = [NSDate dateWithTimeIntervalSinceNow:60*60*24];
+    NSDate *expire = [NSDate dateWithTimeIntervalSinceNow:60 * 60 * 24];
 
     [[NSUserDefaults standardUserDefaults] setBool:YES forKey:KEY_ACTIVE];
     [[NSUserDefaults standardUserDefaults] setObject:@"daily" forKey:KEY_TYPE];
     [[NSUserDefaults standardUserDefaults] setObject:expire forKey:KEY_EXPIRE];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 }
+
+#pragma mark - Permanent Activation
 
 - (void)activatePermanent {
 
     [[NSUserDefaults standardUserDefaults] setBool:YES forKey:KEY_ACTIVE];
     [[NSUserDefaults standardUserDefaults] setObject:@"permanent" forKey:KEY_TYPE];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:KEY_EXPIRE];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 }
+
+#pragma mark - Check Activation
 
 - (BOOL)isActivated {
 
@@ -100,11 +127,28 @@ static NSArray *permanentCodes;
 
     NSDate *expire = [[NSUserDefaults standardUserDefaults] objectForKey:KEY_EXPIRE];
 
+    // 💀 إذا انتهى الوقت = قفل نهائي
     if (expire && [expire timeIntervalSinceNow] < 0) {
+
+        [self hardLock];
         return NO;
     }
 
     return YES;
+}
+
+#pragma mark - HARD LOCK
+
+- (void)hardLock {
+
+    // 🧹 حذف كل بيانات التفعيل
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:KEY_ACTIVE];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:KEY_TYPE];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:KEY_EXPIRE];
+
+    [[NSUserDefaults standardUserDefaults] synchronize];
+
+    NSLog(@"💀 LICENSE EXPIRED - LOCKED PERMANENTLY");
 }
 
 @end
