@@ -1,11 +1,9 @@
 #import "VerificationViewController.h"
-#import <UIKit/UIKit.h>
 
 @interface VerificationViewController ()
 
 @property (nonatomic, strong) UITextField *codeField;
 @property (nonatomic, strong) UIView *card;
-@property (nonatomic, assign) BOOL didShow;
 
 @end
 
@@ -14,10 +12,6 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    // ❌ منع التكرار (حل مشكلة الخانتين)
-    if (self.didShow) return;
-    self.didShow = YES;
-
     [self setupUI];
 }
 
@@ -25,115 +19,100 @@
 
 - (void)setupUI {
 
-    self.view.backgroundColor = UIColor.clearColor;
+    self.view.backgroundColor = [UIColor blackColor];
 
-    // 🌫 خلفية شفافة بدل الشاشة السوداء
-    UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
-    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
-    blurView.frame = self.view.bounds;
-    blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    [self.view addSubview:blurView];
+    UIView *overlay = [[UIView alloc] initWithFrame:self.view.bounds];
+    overlay.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.96];
+    overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self.view addSubview:overlay];
 
-    // 💎 Card VIP واحد فقط
-    self.card = [[UIView alloc] initWithFrame:CGRectMake(40, 180, 300, 320)];
-    self.card.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.75];
+    self.card = [[UIView alloc] initWithFrame:CGRectMake(40, 160, self.view.frame.size.width - 80, 380)];
+    self.card.backgroundColor = [[UIColor darkGrayColor] colorWithAlphaComponent:0.85];
     self.card.layer.cornerRadius = 18;
-    self.card.layer.borderWidth = 1.5;
-    self.card.layer.borderColor = UIColor.systemYellowColor.CGColor;
 
-    self.card.layer.shadowColor = UIColor.blackColor.CGColor;
-    self.card.layer.shadowOpacity = 0.5;
-    self.card.layer.shadowRadius = 12;
-    self.card.layer.shadowOffset = CGSizeMake(0, 6);
+    [overlay addSubview:self.card];
 
-    [self.view addSubview:self.card];
-
-    // 👑 Title
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 20, 300, 30)];
-    title.text = @"MOSTASH VIP ACCESS";
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 20, self.card.frame.size.width, 40)];
+    title.text = @"MOSTASH VIP";
     title.textAlignment = NSTextAlignmentCenter;
     title.textColor = UIColor.whiteColor;
-    title.font = [UIFont boldSystemFontOfSize:18];
+    title.font = [UIFont boldSystemFontOfSize:28];
     [self.card addSubview:title];
 
-    // 🔑 Input (واحد فقط - حل مشكلة الخانتين)
-    self.codeField = [[UITextField alloc] initWithFrame:CGRectMake(30, 90, 240, 45)];
-    self.codeField.placeholder = @"Enter Activation Code";
-    self.codeField.backgroundColor = UIColor.whiteColor;
+    self.codeField = [[UITextField alloc] initWithFrame:CGRectMake(20, 110, self.card.frame.size.width - 40, 50)];
+    self.codeField.placeholder = @"Enter Code";
     self.codeField.textAlignment = NSTextAlignmentCenter;
+    self.codeField.backgroundColor = UIColor.whiteColor;
     self.codeField.layer.cornerRadius = 10;
-    self.codeField.clipsToBounds = YES;
     [self.card addSubview:self.codeField];
 
-    // 🚀 Button
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
-    btn.frame = CGRectMake(30, 160, 240, 45);
-    [btn setTitle:@"ACTIVATE VIP" forState:UIControlStateNormal];
-    [btn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    btn.frame = CGRectMake(20, 190, self.card.frame.size.width - 40, 55);
+    [btn setTitle:@"VERIFY" forState:UIControlStateNormal];
     btn.backgroundColor = UIColor.systemGreenColor;
+    [btn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     btn.layer.cornerRadius = 10;
     [btn addTarget:self action:@selector(checkCode) forControlEvents:UIControlEventTouchUpInside];
     [self.card addSubview:btn];
-
-    // 📦 Info
-    UILabel *info = [[UILabel alloc] initWithFrame:CGRectMake(0, 230, 300, 60)];
-    info.text = @"20 Permanent Codes\n10 Daily Codes";
-    info.numberOfLines = 2;
-    info.textAlignment = NSTextAlignmentCenter;
-    info.textColor = UIColor.lightGrayColor;
-    info.font = [UIFont systemFontOfSize:13];
-    [self.card addSubview:info];
 }
 
-#pragma mark - Logic
+#pragma mark - SERVER REQUEST
 
 - (void)checkCode {
 
     NSString *code = self.codeField.text;
+    if (code.length == 0) return;
 
-    if (code.length == 0) {
-        [self showAlert:@"Error" message:@"Please enter code"];
-        return;
-    }
+    NSString *deviceID = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
 
-    NSArray *dailyCodes = @[
-        @"MOSTASH1", @"MOSTASH2", @"MOSTASH3"
-    ];
+    NSURL *url = [NSURL URLWithString:@"https://YOUR-SERVER.com/api/verify"];
 
-    NSArray *permanentCodes = @[
-        @"MOSTASH7A9K",
-        @"MOSTASH2B6M",
-        @"MOSTASH8C1V"
-        // تقدر تكمل 20 هنا
-    ];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    request.HTTPMethod = @"POST";
+    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
 
-    if ([permanentCodes containsObject:code] || [dailyCodes containsObject:code]) {
+    NSDictionary *body = @{
+        @"code": code,
+        @"device": deviceID
+    };
 
-        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"isActivated"];
-        [[NSUserDefaults standardUserDefaults] synchronize];
+    NSData *data = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
+    request.HTTPBody = data;
 
-        [self showAlert:@"SUCCESS" message:@"Activated Successfully"];
+    NSURLSessionDataTask *task =
+    [[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
 
-    } else {
-        [self showAlert:@"ERROR" message:@"Invalid Code"];
-    }
+        if (error || !data) return;
+
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+
+            if ([json[@"status"] isEqualToString:@"success"]) {
+
+                [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"MOSTASH_VIP"];
+                [[NSUserDefaults standardUserDefaults] synchronize];
+
+                [self showAlert:@"WELCOME VIP 🔥" message:json[@"message"]];
+
+            } else {
+                [self showAlert:@"FAILED ❌" message:json[@"message"]];
+            }
+        });
+
+    }];
+
+    [task resume];
 }
-
-#pragma mark - Alert
 
 - (void)showAlert:(NSString *)title message:(NSString *)msg {
 
     UIAlertController *alert =
-    [UIAlertController alertControllerWithTitle:title
-                                        message:msg
-                                 preferredStyle:UIAlertControllerStyleAlert];
+    [UIAlertController alertControllerWithTitle:title message:msg preferredStyle:UIAlertControllerStyleAlert];
 
-    UIAlertAction *ok =
-    [UIAlertAction actionWithTitle:@"OK"
-                             style:UIAlertActionStyleDefault
-                           handler:nil];
-
+    UIAlertAction *ok = [UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil];
     [alert addAction:ok];
+
     [self presentViewController:alert animated:YES completion:nil];
 }
 
