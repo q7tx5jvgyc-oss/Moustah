@@ -7,7 +7,10 @@
 willConnectToSession:(UISceneSession *)session
 options:(UISceneConnectionOptions *)connectionOptions {
 
-    [[OverlayManager shared] startOverlay];
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        [[OverlayManager shared] startOverlay];
+    });
 }
 
 @end
