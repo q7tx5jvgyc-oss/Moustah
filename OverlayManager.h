@@ -2,5 +2,5 @@
 
 @interface OverlayManager : NSObject
 + (instancetype)shared;
-- (void)startOverlay;
+- (void)start;
 @end
