@@ -14,18 +14,20 @@
         (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
         (__bridge id)kSecAttrService: service,
         (__bridge id)kSecAttrAccount: account,
-        (__bridge id)kSecReturnData: @YES
+        (__bridge id)kSecReturnData: @YES,
+        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne
     };
 
     CFTypeRef result = NULL;
-    SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
 
-    if (result) {
+    if (status == errSecSuccess && result) {
+
         NSData *data = (__bridge_transfer NSData *)result;
         return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
     }
 
-    // إنشاء ID جديد
+    // 🔥 إنشاء ID جديد
     NSString *newID = [self createRawDeviceID];
     NSData *data = [newID dataUsingEncoding:NSUTF8StringEncoding];
 
@@ -36,7 +38,23 @@
         (__bridge id)kSecValueData: data
     };
 
-    SecItemAdd((__bridge CFDictionaryRef)addQuery, NULL);
+    OSStatus addStatus = SecItemAdd((__bridge CFDictionaryRef)addQuery, NULL);
+
+    // 🔥 إذا فشل الإضافة نحاول update
+    if (addStatus != errSecSuccess) {
+
+        NSDictionary *updateQuery = @{
+            (__bridge id)kSecAttrService: service,
+            (__bridge id)kSecAttrAccount: account
+        };
+
+        NSDictionary *updateFields = @{
+            (__bridge id)kSecValueData: data
+        };
+
+        SecItemUpdate((__bridge CFDictionaryRef)updateQuery,
+                      (__bridge CFDictionaryRef)updateFields);
+    }
 
     return newID;
 }
@@ -45,11 +63,11 @@
 
     UIDevice *device = [UIDevice currentDevice];
 
-    NSString *uuid = [[device identifierForVendor] UUIDString];
-    NSString *model = device.model;
-    NSString *system = device.systemVersion;
+    NSString *uuid = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
+    NSString *model = device.model ?: @"unknown";
+    NSString *system = device.systemVersion ?: @"unknown";
 
-    NSString *raw = [NSString stringWithFormat:@"%@-%@-%@", uuid, model, system];
+    NSString *raw = [NSString stringWithFormat:@"%@|%@|%@", uuid, model, system];
 
     const char *cStr = [raw UTF8String];
 
@@ -66,8 +84,6 @@
 }
 
 + (NSString *)generate {
-
-    // 🔥 أهم فرق: ثابت حتى بعد حذف التطبيق
     return [self getOrCreateKeychainID];
 }
 
