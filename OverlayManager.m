@@ -15,57 +15,73 @@
     return obj;
 }
 
+#pragma mark - START
+
 - (void)startOverlay {
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self waitWindow];
+        [self buildOverlay];
     });
 }
 
-- (void)waitWindow {
+#pragma mark - GET WINDOW (SAFE)
 
-    UIWindow *target = nil;
+- (UIWindow *)activeWindow {
 
-    for (int i = 0; i < 50; i++) {
-        for (UIWindow *w in UIApplication.sharedApplication.windows) {
-            if (w.isKeyWindow) {
-                target = w;
-                break;
+    UIWindow *found = nil;
+
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (scene.activationState == UISceneActivationStateForegroundActive &&
+            [scene isKindOfClass:UIWindowScene.class]) {
+
+            for (UIWindow *w in ((UIWindowScene *)scene).windows) {
+                if (w.isKeyWindow) {
+                    found = w;
+                    break;
+                }
             }
         }
-        if (target) break;
-        [NSThread sleepForTimeInterval:0.1];
     }
 
-    if (!target) {
-        target = UIApplication.sharedApplication.windows.firstObject;
-    }
-
-    [self buildOverlay];
+    return found ?: UIApplication.sharedApplication.windows.firstObject;
 }
+
+#pragma mark - BUILD OVERLAY
 
 - (void)buildOverlay {
 
+    UIWindow *hostWindow = [self activeWindow];
+    if (!hostWindow) return;
+
+    // ❗ مهم: لا نعيد إنشاء window كل مرة
+    if (self.overlayWindow) return;
+
     self.overlayWindow = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
-    self.overlayWindow.windowLevel = UIWindowLevelAlert + 999;
+
+    self.overlayWindow.windowScene = hostWindow.windowScene;
+    self.overlayWindow.windowLevel = UIWindowLevelAlert + 1;
+    self.overlayWindow.hidden = NO;
 
     UIViewController *vc = [UIViewController new];
     vc.view.backgroundColor = UIColor.clearColor;
 
-    UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
-    btn.frame = CGRectMake(100, 200, 70, 70);
+    // 🔴 Floating Button
+    UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
+    btn.frame = CGRectMake(80, 200, 70, 70);
     btn.backgroundColor = UIColor.redColor;
+    btn.layer.cornerRadius = 35;
     [btn setTitle:@"M" forState:UIControlStateNormal];
 
-    UIView *panel = [[UIView alloc] initWithFrame:CGRectMake(60, 300, 220, 200)];
-    panel.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.7];
+    // 📦 Panel
+    UIView *panel = [[UIView alloc] initWithFrame:CGRectMake(50, 300, 250, 220)];
+    panel.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
     panel.layer.cornerRadius = 12;
 
-    UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(10, 10, 200, 30)];
+    UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(10, 10, 220, 30)];
     label.text = @"Control Panel";
     label.textColor = UIColor.whiteColor;
-
     [panel addSubview:label];
+
     [vc.view addSubview:panel];
     [vc.view addSubview:btn];
 
