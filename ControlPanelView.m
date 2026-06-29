@@ -1,6 +1,8 @@
 #import "ControlPanelView.h"
 #import <QuartzCore/QuartzCore.h>
 
+#define MAX_TARGETS 10
+
 @interface ControlPanelView ()
 
 @property (nonatomic, strong) UIVisualEffectView *blurView;
@@ -17,17 +19,9 @@
 @property (nonatomic, strong) UIButton *addTargetBtn;
 @property (nonatomic, strong) UIButton *clearBtn;
 
-@property (nonatomic, strong) UIButton *recordBtn;
-@property (nonatomic, strong) UIButton *recordStopBtn;
-
 @property (nonatomic, strong) UIScrollView *listView;
 
-@property (nonatomic, strong) NSMutableArray *macros;
 @property (nonatomic, strong) NSMutableArray *targets;
-
-@property (nonatomic, assign) BOOL recording;
-
-@property (nonatomic, strong) NSTimer *engine;
 
 @end
 
@@ -36,9 +30,6 @@
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-
-        self.macros = [[[NSUserDefaults standardUserDefaults] objectForKey:@"GOD_MACROS"] mutableCopy];
-        if (!self.macros) self.macros = [NSMutableArray array];
 
         self.targets = [NSMutableArray array];
 
@@ -52,65 +43,165 @@
 
 - (void)buildUI {
 
-    self.frame = CGRectMake(25, 180, 260, 420);
+    // 📏 SIZE (smaller + premium)
+    self.frame = CGRectMake(40, 160, 240, 360);
     self.backgroundColor = UIColor.clearColor;
-    self.layer.cornerRadius = 20;
+    self.layer.cornerRadius = 22;
 
-    UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
+    // 🌫️ GLASS EFFECT
+    UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark];
     self.blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
     self.blurView.frame = self.bounds;
-    self.blurView.layer.cornerRadius = 20;
+    self.blurView.layer.cornerRadius = 22;
     self.blurView.clipsToBounds = YES;
     [self addSubview:self.blurView];
 
     self.panel = self.blurView.contentView;
 
-    // TITLE
-    self.titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 10, 260, 25)];
-    self.titleLabel.text = @"MOSTASH CONTROL PANEL";
+    // 🏷 TITLE
+    self.titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 10, 240, 25)];
+    self.titleLabel.text = @"AUTO MOSTASH";
     self.titleLabel.textAlignment = NSTextAlignmentCenter;
     self.titleLabel.textColor = UIColor.whiteColor;
-    self.titleLabel.font = [UIFont boldSystemFontOfSize:16];
+    self.titleLabel.font = [UIFont boldSystemFontOfSize:17];
     [self.panel addSubview:self.titleLabel];
 
-    // SPEED LABEL
-    self.speedLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 40, 260, 20)];
+    // ⚡ SPEED
+    self.speedLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 38, 240, 18)];
     self.speedLabel.text = @"Speed: 1.0x";
     self.speedLabel.textAlignment = NSTextAlignmentCenter;
     self.speedLabel.textColor = UIColor.whiteColor;
-    self.speedLabel.font = [UIFont systemFontOfSize:12];
+    self.speedLabel.font = [UIFont systemFontOfSize:11];
     [self.panel addSubview:self.speedLabel];
 
-    // SPEED SLIDER
-    self.speedSlider = [[UISlider alloc] initWithFrame:CGRectMake(40, 65, 180, 20)];
+    self.speedSlider = [[UISlider alloc] initWithFrame:CGRectMake(35, 60, 170, 18)];
     self.speedSlider.minimumValue = 0.1;
     self.speedSlider.maximumValue = 3.0;
     self.speedSlider.value = 1.0;
-    [self.speedSlider addTarget:self action:@selector(speedChanged:) forControlEvents:UIControlEventValueChanged];
     [self.panel addSubview:self.speedSlider];
 
-    // START / STOP
-    self.startBtn = [self createBtn:@"START" x:20 y:100 w:100 h:35 action:@selector(startEngine)];
-    self.stopBtn  = [self createBtn:@"STOP" x:140 y:100 w:100 h:35 action:@selector(stopEngine)];
+    // 🎮 BUTTONS (smaller)
+    self.startBtn = [self createBtn:@"START" x:15 y:95 w:95 h:32 action:@selector(startEngine)];
+    self.stopBtn  = [self createBtn:@"STOP" x:130 y:95 w:95 h:32 action:@selector(stopEngine)];
+
+    self.addTargetBtn = [self createBtn:@"ADD TARGET" x:15 y:140 w:95 h:32 action:@selector(addTarget)];
+    self.clearBtn     = [self createBtn:@"REMOVE" x:130 y:140 w:95 h:32 action:@selector(removeTarget)];
 
     [self.panel addSubview:self.startBtn];
     [self.panel addSubview:self.stopBtn];
-
-    // TARGETS
-    self.addTargetBtn = [self createBtn:@"ADD TARGET" x:20 y:145 w:100 h:35 action:@selector(addTarget)];
-    self.clearBtn     = [self createBtn:@"CLEAR" x:140 y:145 w:100 h:35 action:@selector(clearTargets)];
-
     [self.panel addSubview:self.addTargetBtn];
     [self.panel addSubview:self.clearBtn];
+}
 
-    // RECORD
-    self.recordBtn = [self createBtn:@"REC" x:20 y:190 w:100 h:35 action:@selector(startRecord)];
-    self.recordStopBtn = [self createBtn:@"STOP REC" x:140 y:190 w:100 h:35 action:@selector(stopRecord)];
+#pragma mark - BUTTON FACTORY
 
-    self.recordStopBtn.hidden = YES;
+- (UIButton *)createBtn:(NSString *)title x:(CGFloat)x y:(CGFloat)y w:(CGFloat)w h:(CGFloat)h action:(SEL)sel {
 
-    [self.panel addSubview:self.recordBtn];
-    [self.panel addSubview:self.recordStopBtn];
+    UIButton *b = [UIButton buttonWithType:UIButtonTypeSystem];
+    b.frame = CGRectMake(x, y, w, h);
 
-    // LIST
-    self.listView = [[UIScrollView alloc]
+    [b setTitle:title forState:UIControlStateNormal];
+    [b setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+
+    b.backgroundColor = [UIColor colorWithWhite:1 alpha:0.08];
+    b.layer.cornerRadius = 8;
+
+    b.titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+
+    [b addTarget:self action:sel forControlEvents:UIControlEventTouchUpInside];
+
+    return b;
+}
+
+#pragma mark - TARGET SYSTEM
+
+- (void)addTarget {
+
+    if (self.targets.count >= MAX_TARGETS) return;
+
+    CGFloat size = 38;
+    CGFloat x = 15 + (self.targets.count * (size + 5));
+    CGFloat y = 200;
+
+    UIView *container = [[UIView alloc] initWithFrame:CGRectMake(x, y, size, size)];
+
+    container.layer.cornerRadius = size / 2;
+    container.clipsToBounds = YES;
+
+    // 🖼 IMAGE (same URL)
+    UIImageView *img = [[UIImageView alloc] initWithFrame:container.bounds];
+    img.contentMode = UIViewContentModeScaleAspectFill;
+
+    NSURL *url = [NSURL URLWithString:@"https://l.top4top.io/p_3831x8fzt0.jpeg"];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        NSData *data = [NSData dataWithContentsOfURL:url];
+        UIImage *image = [UIImage imageWithData:data];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            img.image = image;
+        });
+    });
+
+    [container addSubview:img];
+
+    // 🔢 NUMBER LABEL
+    UILabel *num = [[UILabel alloc] initWithFrame:container.bounds];
+    num.text = [NSString stringWithFormat:@"%lu", (unsigned long)self.targets.count + 1];
+    num.textAlignment = NSTextAlignmentCenter;
+    num.textColor = UIColor.whiteColor;
+    num.font = [UIFont boldSystemFontOfSize:14];
+
+    [container addSubview:num];
+
+    [self.panel addSubview:container];
+    [self.targets addObject:container];
+}
+
+#pragma mark - REMOVE ONE TARGET ONLY
+
+- (void)removeTarget {
+
+    if (self.targets.count == 0) return;
+
+    UIView *last = [self.targets lastObject];
+
+    [UIView animateWithDuration:0.2 animations:^{
+        last.transform = CGAffineTransformMakeScale(0.5, 0.5);
+        last.alpha = 0;
+    } completion:^(BOOL finished) {
+
+        [last removeFromSuperview];
+        [self.targets removeLastObject];
+    }];
+}
+
+#pragma mark - ENGINE (PLACEHOLDER)
+
+- (void)startEngine {
+    NSLog(@"ENGINE START");
+}
+
+- (void)stopEngine {
+    NSLog(@"ENGINE STOP");
+}
+
+#pragma mark - ANIMATION
+
+- (void)animateIn {
+
+    self.alpha = 0;
+    self.transform = CGAffineTransformMakeScale(0.85, 0.85);
+
+    [UIView animateWithDuration:0.25
+                          delay:0
+         usingSpringWithDamping:0.7
+          initialSpringVelocity:0.8
+                        options:UIViewAnimationOptionCurveEaseOut
+                     animations:^{
+        self.alpha = 1;
+        self.transform = CGAffineTransformIdentity;
+    } completion:nil];
+}
+
+@end
