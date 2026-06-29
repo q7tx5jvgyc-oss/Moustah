@@ -1,10 +1,11 @@
 #import "MostashUI.h"
-#import <QuartzCore/QuartzCore.h>
+#import <UIKit/UIKit.h>
 
 @interface MostashFloatingButton ()
 
 @property (strong, nonatomic) UIButton *floatBtn;
 @property (strong, nonatomic) UIView *panel;
+@property (strong, nonatomic) UIView *container;
 @property (assign, nonatomic) BOOL panelVisible;
 
 @end
@@ -17,10 +18,43 @@
 
         self.backgroundColor = UIColor.clearColor;
 
+        [self setupContainer];
         [self setupFloatingButton];
         [self setupPanel];
     }
     return self;
+}
+
+#pragma mark - WINDOW SAFE CONTAINER (IMPORTANT FIX)
+
+- (UIWindow *)getWindow {
+
+    UIWindow *best = nil;
+
+    for (UIWindow *w in UIApplication.sharedApplication.windows) {
+        if (!w.hidden && w.rootViewController) {
+            best = w;
+        }
+    }
+
+    return best;
+}
+
+- (void)setupContainer {
+
+    UIWindow *window = [self getWindow];
+    if (!window) return;
+
+    if (!self.container) {
+        self.container = [[UIView alloc] initWithFrame:window.bounds];
+        self.container.backgroundColor = UIColor.clearColor;
+    }
+
+    if (!self.container.superview) {
+        [window.rootViewController.view addSubview:self.container];
+    }
+
+    [window bringSubviewToFront:self.container];
 }
 
 #pragma mark - UI Setup
@@ -51,14 +85,14 @@
 
     [_floatBtn addGestureRecognizer:pan];
 
-    [self addSubview:_floatBtn];
+    [self.container addSubview:_floatBtn];
 }
 
-#pragma mark - Panel
+#pragma mark - PANEL
 
 - (void)setupPanel {
 
-    _panel = [[UIView alloc] initWithFrame:CGRectMake(0, 80, 280, 320)];
+    _panel = [[UIView alloc] initWithFrame:CGRectMake(40, 180, 280, 320)];
     _panel.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
     _panel.layer.cornerRadius = 14;
     _panel.hidden = YES;
@@ -69,8 +103,6 @@
     title.textAlignment = NSTextAlignmentCenter;
     title.font = [UIFont boldSystemFontOfSize:16];
 
-    [_panel addSubview:title];
-
     UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
     close.frame = CGRectMake(240, 10, 30, 30);
     [close setTitle:@"✕" forState:UIControlStateNormal];
@@ -78,12 +110,13 @@
     [close addTarget:self action:@selector(togglePanel)
     forControlEvents:UIControlEventTouchUpInside];
 
+    [_panel addSubview:title];
     [_panel addSubview:close];
 
-    [self addSubview:_panel];
+    [self.container addSubview:_panel];
 }
 
-#pragma mark - Actions
+#pragma mark - ACTIONS
 
 - (void)togglePanel {
 
@@ -91,30 +124,34 @@
 
     if (self.panelVisible) {
 
-        _panel.center = CGPointMake(self.bounds.size.width/2,
-                                    self.bounds.size.height + 180);
+        self.panel.hidden = NO;
+        self.panel.center = self.floatBtn.center;
 
-        _panel.hidden = NO;
+        [self.container bringSubviewToFront:self.panel];
+        [self.container bringSubviewToFront:self.floatBtn];
 
     } else {
-        _panel.hidden = YES;
+        self.panel.hidden = YES;
     }
 }
 
+#pragma mark - DRAG
+
 - (void)handleDrag:(UIPanGestureRecognizer *)pan {
 
-    CGPoint t = [pan translationInView:self];
+    CGPoint t = [pan translationInView:self.container];
 
     pan.view.center = CGPointMake(pan.view.center.x + t.x,
                                   pan.view.center.y + t.y);
 
-    [pan setTranslation:CGPointZero inView:self];
+    [pan setTranslation:CGPointZero inView:self.container];
 }
 
-#pragma mark - Public
+#pragma mark - PUBLIC
 
 - (void)show {
     self.hidden = NO;
+    [self setupContainer];
 }
 
 - (void)hide {
