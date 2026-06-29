@@ -18,24 +18,21 @@
     return obj;
 }
 
-#pragma mark - SAFE WINDOW (IMPORTANT FIX)
+#pragma mark - SAFE WINDOW
 
 - (UIWindow *)getSafeWindow {
 
     UIWindow *best = nil;
 
-    if (@available(iOS 13.0, *)) {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
 
-        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:UIWindowScene.class]) continue;
 
-            if (![scene isKindOfClass:UIWindowScene.class]) continue;
+        UIWindowScene *ws = (UIWindowScene *)scene;
 
-            UIWindowScene *ws = (UIWindowScene *)scene;
-
-            for (UIWindow *w in ws.windows) {
-                if (!w.hidden && w.rootViewController) {
-                    best = w;
-                }
+        for (UIWindow *w in ws.windows) {
+            if (!w.hidden && w.rootViewController) {
+                best = w;
             }
         }
     }
@@ -54,6 +51,7 @@
 #pragma mark - START
 
 - (void)start {
+
     dispatch_async(dispatch_get_main_queue(), ^{
         [self createUI];
     });
@@ -69,19 +67,21 @@
     UIView *root = window.rootViewController.view;
     if (!root) return;
 
-    // 🔥 container overlay (NOT UIWindow — IMPORTANT FIX)
     if (!self.container) {
+
         self.container = [[UIView alloc] initWithFrame:window.bounds];
         self.container.backgroundColor = UIColor.clearColor;
 
-        // 🔴 Floating button
+        // 🎯 FLOAT BUTTON
         self.floatBtn = [UIButton buttonWithType:UIButtonTypeCustom];
         self.floatBtn.frame = CGRectMake(80, 200, 65, 65);
         self.floatBtn.backgroundColor = UIColor.redColor;
         self.floatBtn.layer.cornerRadius = 32.5;
         [self.floatBtn setTitle:@"M" forState:UIControlStateNormal];
 
-        [self.floatBtn addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
+        [self.floatBtn addTarget:self
+                          action:@selector(togglePanel)
+                forControlEvents:UIControlEventTouchUpInside];
 
         UIPanGestureRecognizer *pan =
         [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(drag:)];
@@ -89,10 +89,11 @@
 
         [self.container addSubview:self.floatBtn];
 
-        // 📦 Panel
+        // 📦 PANEL (pre-attached but hidden)
         self.panel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 280, 220)];
         self.panel.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
         self.panel.layer.cornerRadius = 12;
+        self.panel.alpha = 0;
 
         UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 10, 280, 30)];
         title.text = @"CONTROL PANEL";
@@ -106,9 +107,10 @@
 
         [self.panel addSubview:title];
         [self.panel addSubview:close];
+
+        [self.container addSubview:self.panel];
     }
 
-    // 🔥 attach safely
     if (!self.container.superview) {
         [root addSubview:self.container];
     }
@@ -116,43 +118,69 @@
     [window bringSubviewToFront:self.container];
 }
 
-#pragma mark - RE-ENFORCE (IMPORTANT FOR UNITY / GAMES)
-
-- (void)enforce {
-
-    UIWindow *window = [self getSafeWindow];
-    if (!window) return;
-
-    if (!self.container.superview) {
-        [window.rootViewController.view addSubview:self.container];
-    }
-
-    [window bringSubviewToFront:self.container];
-}
-
-#pragma mark - PANEL TOGGLE
+#pragma mark - TOGGLE PANEL (ANIMATED)
 
 - (void)togglePanel {
 
-    if (!self.panel.superview) {
+    if (!self.panelShown) {
+
         self.panel.center = self.floatBtn.center;
-        [self.container addSubview:self.panel];
+        self.panel.alpha = 0;
+        self.panel.transform = CGAffineTransformMakeScale(0.7, 0.7);
+
+        [UIView animateWithDuration:0.25
+                              delay:0
+             usingSpringWithDamping:0.65
+              initialSpringVelocity:0.9
+                            options:UIViewAnimationOptionCurveEaseOut
+                         animations:^{
+            self.panel.alpha = 1;
+            self.panel.transform = CGAffineTransformIdentity;
+        } completion:nil];
+
         self.panelShown = YES;
+
     } else {
-        [self.panel removeFromSuperview];
-        self.panelShown = NO;
+
+        [UIView animateWithDuration:0.2 animations:^{
+            self.panel.alpha = 0;
+            self.panel.transform = CGAffineTransformMakeScale(0.7, 0.7);
+        } completion:^(BOOL finished) {
+            self.panelShown = NO;
+        }];
     }
 }
 
-#pragma mark - DRAG
+#pragma mark - DRAG (SAFE BOUNDS)
 
 - (void)drag:(UIPanGestureRecognizer *)pan {
 
     UIView *v = pan.view;
-    CGPoint t = [pan translationInView:v.superview];
+    UIWindow *w = [self getSafeWindow];
+    if (!w) return;
 
-    v.center = CGPointMake(v.center.x + t.x, v.center.y + t.y);
-    [pan setTranslation:CGPointZero inView:v.superview];
+    CGPoint t = [pan translationInView:w];
+
+    CGPoint newCenter = CGPointMake(v.center.x + t.x, v.center.y + t.y);
+
+    CGFloat margin = 20;
+
+    newCenter.x = MAX(margin, MIN(w.frame.size.width - margin, newCenter.x));
+    newCenter.y = MAX(margin, MIN(w.frame.size.height - margin, newCenter.y));
+
+    v.center = newCenter;
+
+    [pan setTranslation:CGPointZero inView:w];
+
+    if (pan.state == UIGestureRecognizerStateEnded) {
+
+        CGFloat mid = w.frame.size.width / 2;
+        CGFloat targetX = (v.center.x < mid) ? 50 : (w.frame.size.width - 50);
+
+        [UIView animateWithDuration:0.25 animations:^{
+            v.center = CGPointMake(targetX, v.center.y);
+        }];
+    }
 }
 
 @end
