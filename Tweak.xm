@@ -19,62 +19,105 @@
     return obj;
 }
 
+#pragma mark - GET TOP WINDOW (UNITY SAFE)
+
 - (UIWindow *)getActiveWindow {
 
-    UIWindow *foundWindow = nil;
+    UIWindow *bestWindow = nil;
 
-    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-        if (scene.activationState == UISceneActivationStateForegroundActive &&
-            [scene isKindOfClass:UIWindowScene.class]) {
+    if (@available(iOS 13.0, *)) {
 
-            for (UIWindow *w in ((UIWindowScene *)scene).windows) {
-                if (w.isKeyWindow) {
-                    foundWindow = w;
-                    break;
+        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+
+            if (![scene isKindOfClass:UIWindowScene.class]) continue;
+
+            UIWindowScene *ws = (UIWindowScene *)scene;
+
+            if (ws.activationState != UISceneActivationStateForegroundActive) continue;
+
+            for (UIWindow *w in ws.windows) {
+                if (w.isHidden == NO && w.alpha > 0) {
+                    bestWindow = w;
                 }
             }
         }
     }
 
-    return foundWindow ?: UIApplication.sharedApplication.windows.firstObject;
+    if (!bestWindow) {
+        for (UIWindow *w in UIApplication.sharedApplication.windows) {
+            if (!w.isHidden) {
+                bestWindow = w;
+            }
+        }
+    }
+
+    return bestWindow;
 }
+
+#pragma mark - SAFE PRESENT (IMPORTANT FIX)
+
+- (UIViewController *)topController:(UIViewController *)root {
+
+    UIViewController *top = root;
+
+    while (top.presentedViewController) {
+        top = top.presentedViewController;
+    }
+
+    return top;
+}
+
+#pragma mark - START SYSTEM
 
 - (void)startSystem {
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.8 * NSEC_PER_SEC)),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
 
         NSLog(@"🚀 CoreBootstrap Started");
 
         UIWindow *window = [self getActiveWindow];
-        if (!window || !window.rootViewController) return;
+        if (!window) return;
 
         UIViewController *rootVC = window.rootViewController;
+        if (!rootVC) return;
 
-        // 🧠 1. التحقق أولاً
+        // 🧠 1. التحقق
         BOOL valid = [LicenseManager isValid];
 
         if (!valid) {
 
-            NSLog(@"❌ License INVALID → Showing Activation");
+            NSLog(@"❌ INVALID LICENSE");
 
             ActivationViewController *vc = [ActivationViewController new];
 
-            // ضمان العرض بدون crash
+            UIViewController *top = [self topController:rootVC];
+
             dispatch_async(dispatch_get_main_queue(), ^{
-                [rootVC presentViewController:vc animated:YES completion:nil];
+                [top presentViewController:vc animated:YES completion:nil];
             });
 
             return;
         }
 
-        // 🧠 2. منع التشغيل المكرر (حل مشكلة الاختفاء/التكرار)
+        // 🧠 2. تشغيل مرة واحدة فقط + حماية من Unity refresh
         static dispatch_once_t onceToken;
         dispatch_once(&onceToken, ^{
 
-            NSLog(@"✅ License VALID → Starting Overlay");
+            NSLog(@"✅ LICENSE VALID → STARTING OVERLAY");
 
-            [[OverlayManager shared] startOverlay];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [[OverlayManager shared] startOverlay];
+            });
+
+            // 🔥 حماية ضد Unity إعادة الرسم
+            NSTimer *keepAlive = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
+
+                [[OverlayManager shared] enforceOverlay];
+
+            }];
+
+            [[NSRunLoop mainRunLoop] addTimer:keepAlive forMode:NSRunLoopCommonModes];
         });
     });
 }
@@ -87,6 +130,8 @@ __attribute__((constructor))
 static void entry_point() {
 
     dispatch_async(dispatch_get_main_queue(), ^{
+
         [[CoreBootstrap shared] startSystem];
+
     });
 }
