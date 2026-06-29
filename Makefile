@@ -1,5 +1,5 @@
-TARGET := iphone:clang:latest:14.0
-ARCHS = arm64
+RGET := iphone:clang:latest:14.0
+ARCHS = arm64 arm64e
 
 include $(THEOS)/makefiles/common.mk
 
@@ -25,8 +25,7 @@ MostashClicker_FILES = Tweak.xm \
                        TargetModel.m \
                        Verification.m \
                        ZSFakeTouch.m
-
-MostashClicker_FRAMEWORKS = UIKit Foundation CoreGraphics
+MostashClicker_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore
 
 # تفعيل التجميع التلقائي وإدارة الذاكرة لضمان عمل كافة الملفات معاً بدون تعارض
 MostashClicker_CFLAGS = -fobjc-arc
