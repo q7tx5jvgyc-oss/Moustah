@@ -1,7 +1,10 @@
 #import "OverlayManager.h"
 
 @interface OverlayManager ()
-@property (strong, nonatomic) UIWindow *overlayWindow;
+@property (strong, nonatomic) UIWindow *window;
+@property (strong, nonatomic) UIButton *floatBtn;
+@property (strong, nonatomic) UIView *panel;
+@property (assign, nonatomic) BOOL panelShown;
 @end
 
 @implementation OverlayManager
@@ -15,78 +18,88 @@
     return obj;
 }
 
-#pragma mark - START
+- (UIWindow *)getWindow {
+    return UIApplication.sharedApplication.windows.firstObject;
+}
 
-- (void)startOverlay {
-
+- (void)start {
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self buildOverlay];
+        [self createUI];
     });
 }
 
-#pragma mark - GET WINDOW (SAFE)
+#pragma mark - UI
 
-- (UIWindow *)activeWindow {
+- (void)createUI {
 
-    UIWindow *found = nil;
+    if (self.window) return;
 
-    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-        if (scene.activationState == UISceneActivationStateForegroundActive &&
-            [scene isKindOfClass:UIWindowScene.class]) {
+    UIWindow *baseWindow = [self getWindow];
+    if (!baseWindow) return;
 
-            for (UIWindow *w in ((UIWindowScene *)scene).windows) {
-                if (w.isKeyWindow) {
-                    found = w;
-                    break;
-                }
-            }
-        }
-    }
+    self.window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
+    self.window.windowLevel = UIWindowLevelAlert + 1;
+    self.window.rootViewController = [UIViewController new];
+    self.window.hidden = NO;
+    [self.window makeKeyAndVisible];
 
-    return found ?: UIApplication.sharedApplication.windows.firstObject;
-}
-
-#pragma mark - BUILD OVERLAY
-
-- (void)buildOverlay {
-
-    UIWindow *hostWindow = [self activeWindow];
-    if (!hostWindow) return;
-
-    // ❗ مهم: لا نعيد إنشاء window كل مرة
-    if (self.overlayWindow) return;
-
-    self.overlayWindow = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
-
-    self.overlayWindow.windowScene = hostWindow.windowScene;
-    self.overlayWindow.windowLevel = UIWindowLevelAlert + 1;
-    self.overlayWindow.hidden = NO;
-
-    UIViewController *vc = [UIViewController new];
-    vc.view.backgroundColor = UIColor.clearColor;
+    UIView *root = self.window.rootViewController.view;
 
     // 🔴 Floating Button
-    UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
-    btn.frame = CGRectMake(80, 200, 70, 70);
-    btn.backgroundColor = UIColor.redColor;
-    btn.layer.cornerRadius = 35;
-    [btn setTitle:@"M" forState:UIControlStateNormal];
+    self.floatBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.floatBtn.frame = CGRectMake(80, 200, 65, 65);
+    self.floatBtn.backgroundColor = UIColor.redColor;
+    self.floatBtn.layer.cornerRadius = 32.5;
+    [self.floatBtn setTitle:@"M" forState:UIControlStateNormal];
+
+    [self.floatBtn addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
+
+    UIPanGestureRecognizer *pan =
+    [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(drag:)];
+    [self.floatBtn addGestureRecognizer:pan];
+
+    [root addSubview:self.floatBtn];
 
     // 📦 Panel
-    UIView *panel = [[UIView alloc] initWithFrame:CGRectMake(50, 300, 250, 220)];
-    panel.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
-    panel.layer.cornerRadius = 12;
+    self.panel = [[UIView alloc] initWithFrame:CGRectMake(40, 300, 280, 220)];
+    self.panel.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
+    self.panel.layer.cornerRadius = 12;
 
-    UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(10, 10, 220, 30)];
-    label.text = @"Control Panel";
-    label.textColor = UIColor.whiteColor;
-    [panel addSubview:label];
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 10, 280, 30)];
+    title.text = @"CONTROL PANEL";
+    title.textAlignment = NSTextAlignmentCenter;
+    title.textColor = UIColor.whiteColor;
 
-    [vc.view addSubview:panel];
-    [vc.view addSubview:btn];
+    UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
+    close.frame = CGRectMake(240, 10, 30, 30);
+    [close setTitle:@"X" forState:UIControlStateNormal];
+    [close addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
 
-    self.overlayWindow.rootViewController = vc;
-    [self.overlayWindow makeKeyAndVisible];
+    [self.panel addSubview:title];
+    [self.panel addSubview:close];
+}
+
+#pragma mark - Actions
+
+- (void)togglePanel {
+
+    if (!self.panel.superview) {
+        self.panel.center = self.window.center;
+        [self.window.rootViewController.view addSubview:self.panel];
+        self.panelShown = YES;
+    } else {
+        [self.panel removeFromSuperview];
+        self.panelShown = NO;
+    }
+}
+
+- (void)drag:(UIPanGestureRecognizer *)pan {
+
+    UIView *v = pan.view;
+    CGPoint t = [pan translationInView:v.superview];
+
+    v.center = CGPointMake(v.center.x + t.x, v.center.y + t.y);
+    [pan setTranslation:CGPointZero inView:v.superview];
 }
 
 @end
