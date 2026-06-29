@@ -1,199 +1,72 @@
 #import "Verification.h"
-#import <UIKit/UIKit.h>
+#import "LicenseCore.h"
+#import "OverlaySystem.h"
 
-static NSString *const kVIPKey = @"MOSTASH_VIP";
-static NSString *const kCodesKey = @"MOSTASH_CODES_DB";
+@implementation Verification
 
-@interface MostashVerification ()
-@property (nonatomic, strong) UIWindow *overlayWindow;
-@property (nonatomic, strong) UITextField *codeField;
-@end
-
-@implementation MostashVerification
-
-#pragma mark - INIT DEFAULT CODES
-
-- (NSArray *)loadDefaultCodes {
-
-    return @[
-        // 🔵 DAILY CODES (15)
-        @{@"code": @"MOSTASH7A9K", @"type": @"daily", @"used": @NO},
-        @{@"code": @"MOSTASH2B6M", @"type": @"daily", @"used": @NO},
-        @{@"code": @"MOSTASH8C1V", @"type": @"daily", @"used": @NO},
-        @{@"code": @"MOSTASH5D7N", @"type": @"daily", @"used": @NO},
-        @{@"code": @"MOSTASH9E3X", @"type": @"daily", @"used": @NO},
-        @{@"code": @"MOSTASH1F8T", @"type": @"daily", @"used": @NO},
-        @{@"code": @"MOSTASH6G2R", @"type": @"daily", @"used": @NO},
-        @{@"code": @"MOSTASH3H9Q", @"type": @"daily", @"used": @NO},
-        @{@"code": @"MOSTASH4J5K", @"type": @"daily", @"used": @NO},
-        @{@"code": @"MOSTASH7L1P", @"type": @"daily", @"used": @NO},
-
-        // 🟡 PERMANENT CODES (20)
-        @{@"code": @"MOSTASH7A9K1XQ3", @"type": @"permanent", @"used": @NO},
-        @{@"code": @"MOSTASH2B6M9LZ8", @"type": @"permanent", @"used": @NO},
-        @{@"code": @"MOSTASH8C1V4RT5", @"type": @"permanent", @"used": @NO},
-        @{@"code": @"MOSTASH5D7N2PQ9", @"type": @"permanent", @"used": @NO},
-        @{@"code": @"MOSTASH9E3X6KM1", @"type": @"permanent", @"used": @NO},
-        @{@"code": @"MOSTASH1F8T7YV4", @"type": @"permanent", @"used": @NO},
-        @{@"code": @"MOSTASH6G2R9LX7", @"type": @"permanent", @"used": @NO},
-        @{@"code": @"MOSTASH3H9Q1BZ6", @"type": @"permanent", @"used": @NO},
-        @{@"code": @"MOSTASH4J5K8NM2", @"type": @"permanent", @"used": @NO},
-        @{@"code": @"MOSTASH7L1P3XT9", @"type": @"permanent", @"used": @NO}
-    ];
-}
-
-#pragma mark - LOAD DB
-
-- (NSMutableArray *)loadDB {
-
-    NSMutableArray *db =
-    [[[NSUserDefaults standardUserDefaults] objectForKey:kCodesKey] mutableCopy];
-
-    if (!db) {
-        db = [[self loadDefaultCodes] mutableCopy];
-        [[NSUserDefaults standardUserDefaults] setObject:db forKey:kCodesKey];
-        [[NSUserDefaults standardUserDefaults] synchronize];
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        self.backgroundColor = UIColor.clearColor;
+        [self build];
     }
-
-    return db;
+    return self;
 }
 
-#pragma mark - SHOW UI
+- (void)build {
 
-- (void)showVerificationIfNeeded {
+    UIVisualEffectView *blur =
+    [[UIVisualEffectView alloc] initWithEffect:
+     [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark]];
 
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:kVIPKey]) return;
+    blur.frame = self.bounds;
+    [self addSubview:blur];
 
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self buildUI];
-    });
-}
+    UIView *card = [[UIView alloc] initWithFrame:CGRectMake(40, 250, self.frame.size.width-80, 220)];
+    card.backgroundColor = [UIColor colorWithWhite:1 alpha:0.08];
+    card.layer.cornerRadius = 20;
+    [self addSubview:card];
 
-- (UIWindow *)getWindow {
-
-    UIWindow *w = nil;
-
-    if (@available(iOS 13.0, *)) {
-        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-            if (scene.activationState == UISceneActivationStateForegroundActive &&
-                [scene isKindOfClass:[UIWindowScene class]]) {
-
-                for (UIWindow *win in ((UIWindowScene *)scene).windows) {
-                    if (win.isKeyWindow) {
-                        w = win;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    if (!w) w = UIApplication.sharedApplication.windows.firstObject;
-
-    return w;
-}
-
-- (void)buildUI {
-
-    UIWindow *base = [self getWindow];
-
-    self.overlayWindow = [[UIWindow alloc] initWithFrame:base.bounds];
-    self.overlayWindow.windowLevel = UIWindowLevelAlert + 999;
-    self.overlayWindow.hidden = NO;
-
-    UIViewController *vc = [UIViewController new];
-    vc.view.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
-
-    UIView *card = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 260)];
-    card.center = vc.view.center;
-    card.backgroundColor = UIColor.whiteColor;
-    card.layer.cornerRadius = 14;
-
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 15, 320, 30)];
-    title.text = @"MOSTASH VIP SYSTEM";
-    title.textAlignment = NSTextAlignmentCenter;
-    title.font = [UIFont boldSystemFontOfSize:18];
-
-    self.codeField = [[UITextField alloc] initWithFrame:CGRectMake(20, 80, 280, 40)];
-    self.codeField.placeholder = @"Enter Code";
-    self.codeField.textAlignment = NSTextAlignmentCenter;
-    self.codeField.borderStyle = UITextBorderStyleRoundedRect;
+    UITextField *input = [[UITextField alloc] initWithFrame:CGRectMake(20, 60, card.frame.size.width-40, 45)];
+    input.placeholder = @"ENTER LICENSE";
+    input.backgroundColor = UIColor.whiteColor;
+    input.layer.cornerRadius = 10;
+    input.tag = 101;
+    [card addSubview:input];
 
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
-    btn.frame = CGRectMake(20, 140, 280, 45);
-    [btn setTitle:@"VERIFY" forState:UIControlStateNormal];
-    btn.backgroundColor = UIColor.systemGreenColor;
-    [btn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-    btn.layer.cornerRadius = 8;
-    [btn addTarget:self action:@selector(checkCode) forControlEvents:UIControlEventTouchUpInside];
-
-    [card addSubview:title];
-    [card addSubview:self.codeField];
+    btn.frame = CGRectMake(20, 130, card.frame.size.width-40, 50);
+    [btn setTitle:@"ACTIVATE" forState:UIControlStateNormal];
+    [btn addTarget:self action:@selector(check) forControlEvents:UIControlEventTouchUpInside];
     [card addSubview:btn];
-    [vc.view addSubview:card];
-
-    self.overlayWindow.rootViewController = vc;
-    [self.overlayWindow makeKeyAndVisible];
 }
 
-#pragma mark - CHECK ENGINE
+- (void)check {
 
-- (void)checkCode {
+    UITextField *f = [self viewWithTag:101];
 
-    NSString *input = self.codeField.text;
-    if (input.length == 0) return;
+    if ([[LicenseCore shared] validate:f.text]) {
 
-    NSMutableArray *db = [self loadDB];
+        [[LicenseCore shared] activate:f.text];
 
-    __block BOOL found = NO;
+        [UIView animateWithDuration:0.25 animations:^{
+            self.alpha = 0;
+        } completion:^(BOOL finished) {
 
-    for (NSMutableDictionary *item in db) {
-
-        if ([item[@"code"] isEqualToString:input]) {
-
-            if ([item[@"used"] boolValue] &&
-                [item[@"type"] isEqualToString:@"daily"]) {
-                return;
-            }
-
-            item[@"used"] = @YES;
-
-            found = YES;
-            break;
-        }
-    }
-
-    if (found) {
-
-        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:kVIPKey];
-        [[NSUserDefaults standardUserDefaults] setObject:db forKey:kCodesKey];
-        [[NSUserDefaults standardUserDefaults] synchronize];
-
-        [self.overlayWindow removeFromSuperview];
-        self.overlayWindow = nil;
-
-        NSLog(@"✔ VIP VERIFIED");
+            [self removeFromSuperview];
+            [[OverlaySystem shared] showFloating];
+        }];
 
     } else {
-        [self showError];
+
+        CAKeyframeAnimation *shake =
+        [CAKeyframeAnimation animationWithKeyPath:@"transform.translation.x"];
+
+        shake.values = @[@-10,@10,@-8,@8,@0];
+        shake.duration = 0.4;
+
+        [self.layer addAnimation:shake forKey:@"shake"];
     }
-}
-
-#pragma mark - ERROR
-
-- (void)showError {
-
-    UIAlertController *alert =
-    [UIAlertController alertControllerWithTitle:@"ERROR"
-                                        message:@"Invalid or Used Code"
-                                 preferredStyle:UIAlertControllerStyleAlert];
-
-    [alert addAction:[UIAlertAction actionWithTitle:@"OK"
-                                              style:UIAlertActionStyleDefault
-                                            handler:nil]];
-
-    UIViewController *vc = self.overlayWindow.rootViewController;
-    [vc presentViewController:alert animated:YES completion:nil];
 }
 
 @end
