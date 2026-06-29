@@ -19,11 +19,11 @@
     return obj;
 }
 
-#pragma mark - GET TOP WINDOW (UNITY SAFE)
+#pragma mark - WINDOW SAFE
 
 - (UIWindow *)getActiveWindow {
 
-    UIWindow *bestWindow = nil;
+    UIWindow *best = nil;
 
     if (@available(iOS 13.0, *)) {
 
@@ -36,62 +36,51 @@
             if (ws.activationState != UISceneActivationStateForegroundActive) continue;
 
             for (UIWindow *w in ws.windows) {
-                if (w.isHidden == NO && w.alpha > 0) {
-                    bestWindow = w;
+                if (!w.hidden && w.alpha > 0.0) {
+                    best = w;
+                    break;
                 }
             }
         }
     }
 
-    if (!bestWindow) {
-        for (UIWindow *w in UIApplication.sharedApplication.windows) {
-            if (!w.isHidden) {
-                bestWindow = w;
-            }
-        }
+    if (!best) {
+        best = UIApplication.sharedApplication.windows.firstObject;
     }
 
-    return bestWindow;
+    return best;
 }
 
-#pragma mark - SAFE PRESENT (IMPORTANT FIX)
+#pragma mark - TOP VC
 
-- (UIViewController *)topController:(UIViewController *)root {
-
-    UIViewController *top = root;
-
-    while (top.presentedViewController) {
-        top = top.presentedViewController;
+- (UIViewController *)topVC:(UIViewController *)vc {
+    while (vc.presentedViewController) {
+        vc = vc.presentedViewController;
     }
-
-    return top;
+    return vc;
 }
 
-#pragma mark - START SYSTEM
+#pragma mark - START SYSTEM (FIXED)
 
 - (void)startSystem {
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
 
-        NSLog(@"🚀 CoreBootstrap Started");
+        NSLog(@"🚀 CoreBootstrap STARTED");
 
         UIWindow *window = [self getActiveWindow];
         if (!window) return;
 
-        UIViewController *rootVC = window.rootViewController;
-        if (!rootVC) return;
+        UIViewController *root = window.rootViewController;
+        if (!root) return;
 
-        // 🧠 1. التحقق
-        BOOL valid = [LicenseManager isValid];
-
-        if (!valid) {
-
-            NSLog(@"❌ INVALID LICENSE");
+        // ❌ LICENSE FAIL
+        if (![LicenseManager isValid]) {
 
             ActivationViewController *vc = [ActivationViewController new];
 
-            UIViewController *top = [self topController:rootVC];
+            UIViewController *top = [self topVC:root];
 
             dispatch_async(dispatch_get_main_queue(), ^{
                 [top presentViewController:vc animated:YES completion:nil];
@@ -100,24 +89,29 @@
             return;
         }
 
-        // 🧠 2. تشغيل مرة واحدة فقط + حماية من Unity refresh
+        // ✅ START ONCE ONLY
         static dispatch_once_t onceToken;
         dispatch_once(&onceToken, ^{
 
-            NSLog(@"✅ LICENSE VALID → STARTING OVERLAY");
+            NSLog(@"✅ LICENSE OK → INIT OVERLAY");
 
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [[OverlayManager shared] startOverlay];
-            });
+            [[OverlayManager shared] startOverlay];
 
-            // 🔥 حماية ضد Unity إعادة الرسم
-            NSTimer *keepAlive = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
+            // 🔁 KEEP ALIVE FIX (IMPORTANT)
+            NSTimer *t = [NSTimer timerWithTimeInterval:1.5
+                                                 repeats:YES
+                                                   block:^(NSTimer * _Nonnull timer) {
 
-                [[OverlayManager shared] enforceOverlay];
+                OverlayManager *om = [OverlayManager shared];
+
+                // بدل إعادة startOverlay كل مرة
+                if (![om isAlive]) {
+                    [om startOverlay];
+                }
 
             }];
 
-            [[NSRunLoop mainRunLoop] addTimer:keepAlive forMode:NSRunLoopCommonModes];
+            [[NSRunLoop mainRunLoop] addTimer:t forMode:NSRunLoopCommonModes];
         });
     });
 }
@@ -130,8 +124,6 @@ __attribute__((constructor))
 static void entry_point() {
 
     dispatch_async(dispatch_get_main_queue(), ^{
-
         [[CoreBootstrap shared] startSystem];
-
     });
 }
