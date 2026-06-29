@@ -1,31 +1,27 @@
 #import <UIKit/UIKit.h>
+#import "OverlayManager.h"
+#import "LicenseManager.h"
+#import "ActivationViewController.h"
 
-#pragma mark - Core Controller
-
-@interface MostashCore : NSObject
+@interface CoreBootstrap : NSObject
 + (instancetype)shared;
-- (void)start;
-- (void)toggleMenu;
+- (void)startSystem;
 @end
 
-@implementation MostashCore {
-    UIButton *floatingButton;
-    UIView *menuView;
-    BOOL menuShown;
-    CGPoint lastPos;
-}
+@implementation CoreBootstrap
 
 + (instancetype)shared {
-    static MostashCore *obj;
+    static CoreBootstrap *obj;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        obj = [MostashCore new];
+        obj = [CoreBootstrap new];
     });
     return obj;
 }
 
-- (UIWindow *)getWindow {
-    UIWindow *window = nil;
+- (UIWindow *)getActiveWindow {
+
+    UIWindow *foundWindow = nil;
 
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (scene.activationState == UISceneActivationStateForegroundActive &&
@@ -33,106 +29,54 @@
 
             for (UIWindow *w in ((UIWindowScene *)scene).windows) {
                 if (w.isKeyWindow) {
-                    window = w;
+                    foundWindow = w;
                     break;
                 }
             }
         }
     }
 
-    if (!window) {
-        window = UIApplication.sharedApplication.windows.firstObject;
-    }
-
-    return window;
+    return foundWindow ?: UIApplication.sharedApplication.windows.firstObject;
 }
 
-#pragma mark - START
+- (void)startSystem {
 
-- (void)start {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1.5 * NSEC_PER_SEC),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.8 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
 
-        UIWindow *window = [self getWindow];
-        if (!window) return;
+        NSLog(@"🚀 CoreBootstrap Started");
 
-        UIView *root = window.rootViewController.view ?: window;
+        UIWindow *window = [self getActiveWindow];
+        if (!window || !window.rootViewController) return;
 
-        if (!floatingButton) {
-            floatingButton = [UIButton buttonWithType:UIButtonTypeCustom];
-            floatingButton.frame = CGRectMake(80, 200, 70, 70);
-            floatingButton.backgroundColor = [UIColor redColor];
-            floatingButton.layer.cornerRadius = 35;
-            [floatingButton setTitle:@"M" forState:UIControlStateNormal];
-            [floatingButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        UIViewController *rootVC = window.rootViewController;
 
-            [floatingButton addTarget:self
-                               action:@selector(toggleMenu)
-                     forControlEvents:UIControlEventTouchUpInside];
+        // 🧠 1. التحقق أولاً
+        BOOL valid = [LicenseManager isValid];
 
-            UIPanGestureRecognizer *pan =
-            [[UIPanGestureRecognizer alloc] initWithTarget:self
-                                                    action:@selector(handlePan:)];
+        if (!valid) {
 
-            [floatingButton addGestureRecognizer:pan];
+            NSLog(@"❌ License INVALID → Showing Activation");
 
-            lastPos = floatingButton.center;
+            ActivationViewController *vc = [ActivationViewController new];
 
-            [root addSubview:floatingButton];
+            // ضمان العرض بدون crash
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [rootVC presentViewController:vc animated:YES completion:nil];
+            });
+
+            return;
         }
 
-        [root bringSubviewToFront:floatingButton];
+        // 🧠 2. منع التشغيل المكرر (حل مشكلة الاختفاء/التكرار)
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+
+            NSLog(@"✅ License VALID → Starting Overlay");
+
+            [[OverlayManager shared] startOverlay];
+        });
     });
-}
-
-#pragma mark - MENU
-
-- (void)toggleMenu {
-    UIWindow *window = [self getWindow];
-    if (!window) return;
-
-    UIView *root = window.rootViewController.view ?: window;
-
-    if (!menuView) {
-        menuView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 300, 300)];
-        menuView.backgroundColor = [UIColor colorWithWhite:0 alpha:0.9];
-        menuView.layer.cornerRadius = 15;
-
-        UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 20, 300, 30)];
-        title.text = @"CONTROL PANEL";
-        title.textAlignment = NSTextAlignmentCenter;
-        title.textColor = UIColor.whiteColor;
-        [menuView addSubview:title];
-
-        UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
-        close.frame = CGRectMake(250, 10, 40, 40);
-        [close setTitle:@"X" forState:UIControlStateNormal];
-        [close addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
-        [menuView addSubview:close];
-    }
-
-    if (!menuShown) {
-        menuView.center = root.center;
-        [root addSubview:menuView];
-        menuShown = YES;
-    } else {
-        [menuView removeFromSuperview];
-        menuShown = NO;
-    }
-}
-
-#pragma mark - DRAG
-
-- (void)handlePan:(UIPanGestureRecognizer *)pan {
-    UIView *v = pan.view;
-    CGPoint t = [pan translationInView:v.superview];
-
-    v.center = CGPointMake(v.center.x + t.x, v.center.y + t.y);
-    [pan setTranslation:CGPointZero inView:v.superview];
-
-    if (pan.state == UIGestureRecognizerStateEnded) {
-        lastPos = v.center;
-    }
 }
 
 @end
@@ -140,8 +84,9 @@
 #pragma mark - ENTRY POINT
 
 __attribute__((constructor))
-static void init_core() {
-    NSLog(@"Loaded Core");
+static void entry_point() {
 
-    [[MostashCore shared] start];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[CoreBootstrap shared] startSystem];
+    });
 }
