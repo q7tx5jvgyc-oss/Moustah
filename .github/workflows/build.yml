@@ -11,24 +11,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build tweak
+      - name: Build Tweak
         uses: Randomblock1/theos-action@v1
 
-      - name: Find ONLY dylib
+      - name: Locate and Extract THE GENUINE FINAL DYLIB
         run: |
           mkdir -p output
+          
+          echo "🌐 Searching for the compiled production binaries..."
+          
+          # استهداف مسار البناء النهائي المعتمد في الـ Theos Actions
+          FINAL_DYLIB="./.theos/obj/debug/MostashClicker.dylib"
+          
+          if [ ! -f "$FINAL_DYLIB" ]; then
+              FINAL_DYLIB="./.theos/obj/MostashClicker.dylib"
+          fi
+          
+          # إذا لم يعثر عليه في المسارات الافتراضية، نقوم بعمل فحص شامل واختيار أكبر ملف حقيقي بالبايت
+          if [ ! -f "$FINAL_DYLIB" ]; then
+              echo "⚠️ Default path missing. Engaging high-capacity size filter..."
+              
+              # جلب كافة ملفات الـ dylib مع استبعاد مجلد المخرجات لعدم التكرار، ثم ترتيبها تنازلياً حسب الحجم واختيار الأول
+              FINAL_DYLIB=$(find . -name "*.dylib" -not -path "*/output/*" -printf "%s %p\n" | sort -nr | head -n 1 | awk '{print $2}')
+          fi
 
-          # أخذ أول dylib فقط (الملف النهائي)
-          FILE=$(find . -name "*.dylib" | head -n 1)
+          if [ -z "$FINAL_DYLIB" ] || [ ! -f "$FINAL_DYLIB" ]; then
+              echo "❌ Error: Final Compiled Dylib not found in the project workspace!"
+              exit 1
+          fi
 
-          echo "Found dylib: $FILE"
+          echo "🎯 GENUINE BINARY FOUND AT: $FINAL_DYLIB"
+          
+          # نسخ الملف الحقيقي وتأمينه داخل مجلد المخرجات
+          cp "$FINAL_DYLIB" output/MostashClicker.dylib
+          
+          echo "📊 [Binary Properties]:"
+          ls -lah output/MostashClicker.dylib
 
-          cp "$FILE" output/MostashClicker.dylib
-
-          ls -lah output
-
-      - name: Upload ONLY dylib
+      - name: Upload GENUINE FINAL DYLIB ONLY
         uses: actions/upload-artifact@v4
         with:
-          name: MostashClicker-dylib
+          name: MostashClicker-Production-Dylib
           path: output/MostashClicker.dylib
