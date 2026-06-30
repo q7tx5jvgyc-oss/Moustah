@@ -1,6 +1,9 @@
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 
-// إعلان الواجهات البرمجية الخاصة بملفات المشروع لضمان عدم حدوث أخطاء أثناء البناء
+// ============================================================================
+// 1. إعلان الواجهات البرمجية الخارجية
+// ============================================================================
 @interface OverlayManager : NSObject
 + (instancetype)shared;
 - (void)startOverlay;
@@ -17,11 +20,13 @@
 @interface CoreBootstrap : NSObject
 + (instancetype)shared;
 - (void)startSystem;
+- (void)destroyAuthWindow;
 @end
 
-// متغيرات ثابتة للاحتفاظ بنوافذ العرض المخصصة في الذاكرة ومنع اختفائها
-static UIWindow *customAuthWindow = nil; 
-static UIWindow *customMenuWindow = nil;
+// متغيرات ثابتة محمية من نظام إدارة الذاكرة والتصفير التلقائي للعبة
+static UIWindow *customAuthWindow = nil;
+static CADisplayLink *displayLinkGuardian = nil;
+static BOOL isSystemDeployed = NO;
 
 @implementation CoreBootstrap
 
@@ -34,123 +39,182 @@ static UIWindow *customMenuWindow = nil;
     return obj;
 }
 
-#pragma mark - WINDOW GETTER (OPTIMIZED FOR GAME ENGINES)
+#pragma mark - 🎯 MULTI-STRATEGY WINDOW AGGRESSIVE CAPTURER
 
-- (UIWindow *)getActiveWindow {
-    UIWindow *bestWindow = nil;
+- (UIWindow *)getUltimateGameWindow {
+    UIWindow *targetWindow = nil;
 
-    // 1. المحاولة الأولى: جلب النافذة عبر مفوض التطبيق الرئيسي (الأكثر استقراراً في الألعاب)
-    if ([UIApplication sharedApplication].delegate && [[UIApplication sharedApplication].delegate respondsToSelector:@selector(window)]) {
-        bestWindow = [[UIApplication sharedApplication].delegate window];
-    }
-
-    // 2. المحاولة الثانية: البحث في النوافذ النشطة في نظام iOS 13 فما فوق
-    if (!bestWindow && @available(iOS 13.0, *)) {
+    // الاستراتيجية 1: الاستحواذ على الـ KeyWindow المباشر النشط للشاشة
+    if (@available(iOS 13.0, *)) {
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-            if (![scene isKindOfClass:UIWindowScene.class]) continue;
-            UIWindowScene *windowScene = (UIWindowScene *)scene;
-            if (windowScene.activationState != UISceneActivationStateForegroundActive) continue;
-            
-            for (UIWindow *w in windowScene.windows) {
-                if (!w.hidden && w.alpha > 0.0 && w.bounds.size.width > 100) {
-                    bestWindow = w;
-                    break;
+            if (scene.activationState == UISceneActivationStateForegroundActive && [scene isKindOfClass:[UIWindowScene class]]) {
+                UIWindowScene *windowScene = (UIWindowScene *)scene;
+                for (UIWindow *w in windowScene.windows) {
+                    if (w.isKeyWindow && w != customAuthWindow) {
+                        targetWindow = w;
+                        break;
+                    }
                 }
             }
         }
     }
 
-    // 3. المحاولة الأخيرة: جلب النافذة الأولى المتاحة
-    if (!bestWindow) {
-        bestWindow = UIApplication.sharedApplication.windows.firstObject;
+    // الاستراتيجية 2: انتزاع النافذة من الـ Delegate الرئيسي للعبة مباشرة
+    if (!targetWindow && [UIApplication sharedApplication].delegate && [[UIApplication sharedApplication].delegate respondsToSelector:@selector(window)]) {
+        targetWindow = [[UIApplication sharedApplication].delegate window];
     }
 
-    return bestWindow;
+    // الاستراتيجية 3: البحث عن أول نافذة رسومية مرئية تحتوي على الـ RootViewController الخاص باللعبة
+    if (!targetWindow) {
+        for (UIWindow *w in UIApplication.sharedApplication.windows) {
+            if (w != customAuthWindow && w.rootViewController && !w.hidden) {
+                targetWindow = w;
+                break;
+            }
+        }
+    }
+
+    // الاستراتيجية الأخيرة: جلب النافذة الأولى في المصفوفة الافتراضية
+    if (!targetWindow) {
+        targetWindow = UIApplication.sharedApplication.windows.firstObject;
+    }
+
+    return targetWindow;
 }
 
-#pragma mark - LOOP SYSTEM INITIALIZATION
+#pragma mark - 🦾 HARDENED ENGINE INJECTION
 
 - (void)startSystem {
-    // تايمر دوري يفحص جاهزية واجهة اللعبة كل 0.5 ثانية قبل محاولة حقن النوافذ لمنع الكراش
-    __block NSTimer *initTimer = [NSTimer scheduledTimerWithTimeInterval:0.5 repeats:YES block:^(NSTimer * _Nonnull timer) {
-        
-        UIWindow *gameWindow = [self getActiveWindow];
-        if (!gameWindow) return; // اللعبة لم تنشئ النافذة بعد، انتظر الدورة القادمة
+    if (isSystemDeployed) return;
+    isSystemDeployed = YES;
 
-        UIViewController *root = gameWindow.rootViewController;
-        if (!root) return; // محرك اللعبة لم يقم بتعيين المتحكم الرئيسي بعد، انتظر
+    NSLog(@"🛡️ [MostashClicker] Ultimate Sideload Guardian Engaged.");
+
+    // تايمر فحص سريع وعنيف جداً (كل 0.1 ثانية) لانتزاع التحكم فور بدء الرسوميات
+    __block NSTimer *injectionTimer = [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer * _Nonnull timer) {
         
-        // بمجرد العثور على النافذة والمتحكم وجاهزية اللعبة، يتم إيقاف التايمر فوراً وبدء العرض
+        UIWindow *gameWindow = [self getUltimateGameWindow];
+        if (!gameWindow || !gameWindow.rootViewController) return;
+
+        // تم العثور على نافذة محرك اللعبة، إيقاف الفحص المبدئي فوراً
         [timer invalidate];
         
-        NSLog(@"🎯 [CoreBootstrap] Game target ready. Initializing custom windows...");
+        NSLog(@"🎯 [MostashClicker] Game Window Captured! Injecting layers...");
 
-        // ----------------------------------------------------
-        // الحالة الأولى: فشل التحقق أو الترخيص غير صالح ❌
-        // ----------------------------------------------------
+        // --------------------------------------------------------------------
+        // [الحالة الأولى]: الكود غير مفعل أو منتهي ❌ -> فرض شاشة التحقق قسرياً
+        // --------------------------------------------------------------------
         if (![LicenseManager isValid]) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                // إنشاء نافذة مستقلة تماماً لواجهة التحقق
-                customAuthWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
                 
-                // رفع مستوى النافذة لأعلى درجة لتكون فوق اللعبة والإشعارات
-                customAuthWindow.windowLevel = UIWindowLevelStatusBar + 2000.0;
+                // إنشاء نافذة حرة ومستقلة لتجنب دمجها أو كتمها بواسطة كلاسات اللعبة
+                customAuthWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
                 customAuthWindow.backgroundColor = [UIColor clearColor];
                 
-                // تعيين شاشة التحقق كمتحكم رئيسي للنافذة الجديدة
                 ActivationViewController *authVC = [ActivationViewController new];
                 customAuthWindow.rootViewController = authVC;
                 
-                // إظهار النافذة وتفعيل التفاعل معها
+                // عرض النافذة وتثبيتها كـ KeyWindow للنظام
                 [customAuthWindow makeKeyAndVisible];
                 
-                NSLog(@"🔐 [CoreBootstrap] Verification window displayed successfully.");
+                // 🔥 الترقية القصوى: استخدام CADisplayLink للمزامنة مع هرتز الشاشة (60Hz/120Hz)
+                // هذا التايمر يتنفذ مع كل فريم ترسمه اللعبة ليعيد سحب واجهتك للأعلى بقوة
+                displayLinkGuardian = [CADisplayLink displayLinkWithTarget:self selector:@selector(forceInterfaceToTop)];
+                [displayLinkGuardian addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+                
+                NSLog(@"🔐 [MostashClicker] Dynamic CADisplayLink Guardian is now locking auth interface on top.");
             });
             return;
         }
 
-        // ----------------------------------------------------
-        // الحالة الثانية: الترخيص صالح وجاهز لعرض القائمة ✅
-        // ----------------------------------------------------
-        static dispatch_once_t onceToken;
-        dispatch_once(&onceToken, ^{
+        // --------------------------------------------------------------------
+        // [الحالة الثانية]: الكود صالح وجاهز ✅ -> تشغيل القائمة والزر العائم
+        // --------------------------------------------------------------------
+        [self deployMenuSystem];
+    });
+}
+
+// دالة الحفاظ القسري والمزامنة الفريمية (تمنع محرك اللعبة تماماً من حجب الواجهة)
+- (void)forceInterfaceToTop {
+    if (customAuthWindow) {
+        customAuthWindow.hidden = NO;
+        customAuthWindow.alpha = 1.0;
+        
+        // رفع الرتبة إلى القيمة المليونية القصوى المتاحة هندسياً في iOS (أعلى من أي تنبيه أو لوحة نظام)
+        if (customAuthWindow.windowLevel < (UIWindowLevelStatusBar + 99999.0)) {
+            customAuthWindow.windowLevel = UIWindowLevelStatusBar + 99999.0;
+        }
+        
+        // إجبار النظام على جلب النافذة للمقدمة في كل فريم (Z-Order Hijacking)
+        [customAuthWindow.superview bringSubviewToFront:customAuthWindow];
+    } else {
+        // إذا تم التحقق بنجاح وتدمير النافذة، قم بإلغاء الحارس فوراً لتوفير المعالج
+        if (displayLinkGuardian) {
+            [displayLinkGuardian invalidate];
+            displayLinkGuardian = nil;
+        }
+    }
+}
+
+- (void)deployMenuSystem {
+    static dispatch_once_t onceMenuToken;
+    dispatch_once(&onceMenuToken, ^{
+        dispatch_async(dispatch_get_main_queue(), ^{
             
-            dispatch_async(dispatch_get_main_queue(), ^{
-                // استدعاء نظام العرض الأصلي لديك من ملف OverlayManager
-                [[OverlayManager shared] startOverlay];
-                
-                // تايمر حماية للحفاظ على رتبة النوافذ في المقدمة ومقاومة إخفاء محرك اللعبة لها
-                NSTimer *keepAlive = [NSTimer timerWithTimeInterval:2.0
-                                                     repeats:YES
-                                                       block:^(NSTimer * _Nonnull t) {
-                    
-                    // 1. إعادة تشغيل الواجهة إذا أغلقتها اللعبة برمجياً
-                    OverlayManager *om = [OverlayManager shared];
-                    if (![om isAlive]) {
-                        [[OverlayManager shared] startOverlay];
-                    }
-                    
-                    // 2. إعادة إجبار نافذة التحقق (إن وُجدت) لتظل في الأعلى (Z-Order)
-                    if (customAuthWindow && customAuthWindow.windowLevel < (UIWindowLevelStatusBar + 2000.0)) {
-                        customAuthWindow.windowLevel = UIWindowLevelStatusBar + 2000.0;
-                    }
-                }];
-                
-                [[NSRunLoop mainRunLoop] addTimer:keepAlive forMode:NSRunLoopCommonModes];
-                NSLog(@"🚀 [CoreBootstrap] Menu/Overlay successfully loaded on top of the game.");
-            });
+            // تشغيل الـ Overlay والزر العائم الخاص بك
+            [[OverlayManager shared] startOverlay];
+            
+            // تايمر مراقبة دائم لإعادة الواجهة حية في حال قيام اللعبة بعمل Refresh أو تدمير للنوافذ
+            NSTimer *menuKeepAlive = [NSTimer timerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull t) {
+                if (![[OverlayManager shared] isAlive]) {
+                    [[OverlayManager shared] startOverlay];
+                }
+            }];
+            [[NSRunLoop mainRunLoop] addTimer:menuKeepAlive forMode:NSRunLoopCommonModes];
+            
+            NSLog(@"🌟 [MostashClicker] Elite Menu system successfully attached to the active thread.");
         });
-    }];
+    });
+}
+
+// دالة عامة لاستدعائها من ملف Verification.m فور نجاح كود التفعيل لتدمير حارس الأمان والانتقال للميزات
+- (void)destroyAuthWindow {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (displayLinkGuardian) {
+            [displayLinkGuardian invalidate];
+            displayLinkGuardian = nil;
+        }
+        if (customAuthWindow) {
+            customAuthWindow.hidden = YES;
+            [customAuthWindow removeFromSuperview];
+            customAuthWindow = nil;
+        }
+        // بعد تدمير واجهة التحقق، قم فوراً باستدعاء القائمة والزر العائم
+        [self deployMenuSystem];
+    });
 }
 
 @end
 
-#pragma mark - INITIAL ENTRY POINT
+#pragma mark - PURE INDUSTRIAL FORWARD CONSTRUCTOR (THE PERFECT SIDELOAD ENTRY)
 
+// نقطة الانطلاق الحديدية للسايدلود (تفادي كامل لأكواد الـ Substrate/Logos لضمان التوافق مع Ksign)
 __attribute__((constructor))
-static void entry_point() {
-    // تنفيذ الكود كاملاً على الخيط الرئيسي (Main Thread) لأن الـ UIKit يتطلب ذلك دائماً
-    dispatch_async(dispatch_get_main_queue(), ^{
+static void dynamic_pure_entry() {
+    // الاستماع الفوري لإشعار النظام الرسمي عند اكتمال تحميل بيئة التطبيق بالذاكرة
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification
+                                                      object:nil
+                                                       queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        NSLog(@"🚀 [MostashClicker] Pure Entry: Game lifecycle notification caught.");
         [[CoreBootstrap shared] startSystem];
+    }];
+    
+    // نظام أمان احتياطي مائل للوقت السريع (1.0 ثانية فقط) للحقن القسري المبكر
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (!isSystemDeployed) {
+            NSLog(@"⚠️ [MostashClicker] Pure Entry: Fallback execution triggered.");
+            [[CoreBootstrap shared] startSystem];
+        }
     });
 }
